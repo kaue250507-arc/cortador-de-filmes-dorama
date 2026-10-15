@@ -11,21 +11,32 @@ st.set_page_config(page_title="DoramaX Pro", page_icon="🎬", layout="centered"
 def limpar_legenda_kwai(texto):
     if not texto:
         return ""
+    
+    # 1. Trava anti-repetição do Kwai ("Legenda, Autor, Legenda")
+    partes = texto.split(',')
+    if len(partes) >= 2:
+        candidato = partes[0].strip()
+        # Se a primeira parte tiver mais de 10 letras e for repetida no final da frase, guardamos só a primeira
+        if len(candidato) > 10 and candidato in texto[len(candidato):]:
+            texto = candidato
+            
     if ":" in texto:
-        partes = texto.split(":", 1)
-        if len(partes) > 1 and len(partes[1].strip()) > 5:
-            texto = partes[1]
+        partes_dois = texto.split(":", 1)
+        if len(partes_dois) > 1 and len(partes_dois[1].strip()) > 5:
+            texto = partes_dois[1]
 
-    # Remove hashtags, menções e links do Kwai
+    # 2. Remove hashtags, menções e links do Kwai
     texto = re.sub(r'#\S+', '', texto)
     texto = re.sub(r'@\S+', '', texto)
     texto = re.sub(r'https?://\S+', '', texto)
-    texto = re.sub(r'(?i)doramas?\s*(brasil|br|oficial|coreano)?', '', texto)
-    texto = texto.replace('"', '').replace("'", "")
     
-    frases = [f.strip() for f in texto.split('.') if len(f.strip()) > 3]
-    if frases:
-        texto = frases[0]
+    # 3. Remove restos de nomes de contas de canais concorrentes
+    texto = re.sub(r'(?i)doramas?\s*(brasil|br|oficial|coreano)?', '', texto)
+    texto = re.sub(r'(?i)drosil', '', texto) # Limpa se sobrar "Drosil"
+    
+    # 4. Limpa aspas e parênteses estranhos
+    texto = texto.replace('"', '').replace("'", "").replace("(", "").replace(")", "")
+    
     return " ".join(texto.split()).strip()
 
 def quebrar_duas_linhas(frase):
@@ -103,7 +114,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
     st.subheader("3. Personalização do Corte")
     
     texto_final = st.text_input(
-        "Texto de Destaque no Topo (ele será dividido em 2 linhas automaticamente):", 
+        "Texto de Destaque no Topo (será dividido em 2 linhas automaticamente):", 
         value=st.session_state.get("legenda_detectada", "")
     )
     
@@ -138,13 +149,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 with open(txt2_path, "w", encoding="utf-8") as f:
                     f.write(l2)
 
-                # Recorta o centro da cena para remover as faixas e logos do corte anterior
                 if "Recortar cena central limpa" in ajuste_corte:
                     filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
                 else:
                     filtro_video = "[1:v]scale=1080:-2[vid];"
 
-                # Texto em PRETO puro, centralizado e posicionado na faixa rosa abaixo da logo
                 draw_l1 = (
                     f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':"
                     f"fontcolor=black:fontsize=50:"
