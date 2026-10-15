@@ -34,10 +34,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Nomes fixos para os ficheiros ficarem salvos no servidor
-MOLDE_SALVO = os.path.abspath("molde_guardado.png")
-FONTE_SALVA = os.path.abspath("fonte_guardada.ttf")
-
 def limpar_legenda_kwai(texto):
     if not texto:
         return ""
@@ -88,26 +84,12 @@ col_topo_1, col_topo_2 = st.columns([1, 1])
 
 with col_topo_1:
     with st.container(border=True):
-        st.markdown("### 📁 1. Ficheiros de Identidade Visual")
+        st.markdown("### 📁 1. Arquivos de Identidade Visual")
         col_molde, col_fonte = st.columns(2)
-        
         with col_molde:
-            fundo_user = st.file_uploader("Molde Rosa (JPG/PNG)", type=["jpg", "jpeg", "png"])
-            if fundo_user:
-                with open(MOLDE_SALVO, "wb") as f:
-                    f.write(fundo_user.getbuffer())
-                st.success("✅ Molde guardado!")
-            elif os.path.exists(MOLDE_SALVO):
-                st.info("✅ Molde ativo na memória")
-
+            fundo_user = st.file_uploader("Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
         with col_fonte:
             fonte_user = st.file_uploader("Fonte (TTF)", type=["ttf"])
-            if fonte_user:
-                with open(FONTE_SALVA, "wb") as f:
-                    f.write(fonte_user.getbuffer())
-                st.success("✅ Fonte guardada!")
-            elif os.path.exists(FONTE_SALVA):
-                st.info("✅ Fonte ativa na memória")
 
 with col_topo_2:
     with st.container(border=True):
@@ -118,7 +100,7 @@ with col_topo_2:
             if not link_kwai or not link_kwai.startswith("http"):
                 st.warning("⚠️ Insira um link válido do Kwai.")
             else:
-                with st.spinner("A estabelecer ligação com o Kwai e a transferir o vídeo..."):
+                with st.spinner("Conectando ao Kwai e baixando vídeo..."):
                     try:
                         req = urllib.request.Request(link_kwai, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
                         with urllib.request.urlopen(req, timeout=12) as resp:
@@ -140,7 +122,7 @@ with col_topo_2:
                             st.session_state["legenda_detectada"] = legenda_kwai or "ASSISTA ATÉ AO FIM"
                             st.toast("✅ Vídeo e legenda importados com sucesso!")
                         else:
-                            st.error("Não foi possível encontrar o ficheiro MP4 no link fornecido.")
+                            st.error("Não foi possível encontrar o arquivo MP4 no link fornecido.")
                     except Exception as e:
                         st.error(f"Erro na ligação ao Kwai: {e}")
 
@@ -172,27 +154,33 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             st.markdown('</div>', unsafe_allow_html=True)
 
             if btn_gerar:
-                # Usa os ficheiros guardados em disco caso o utilizador não envie novamente
-                if not os.path.exists(MOLDE_SALVO) or not os.path.exists(FONTE_SALVA):
-                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 pelo menos uma vez para ficarem guardados.")
+                if not fundo_user or not fonte_user:
+                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                 else:
-                    with st.status("🎬 A renderizar o corte...", expanded=True) as status:
-                        st.write("📥 A preparar os ficheiros base...")
+                    with st.status("🎬 Renderizando o corte...", expanded=True) as status:
+                        st.write("📥 Preparando arquivos da sessão...")
                         l1, l2 = quebrar_duas_linhas(texto_final)
+                        
+                        caminho_molde = os.path.join(pasta_temp, "molde.jpg")
+                        caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
                         caminho_saida = os.path.join(pasta_temp, "resultado.mp4")
                         txt1_path = os.path.join(pasta_temp, "l1.txt")
                         txt2_path = os.path.join(pasta_temp, "l2.txt")
 
+                        with open(caminho_molde, "wb") as f:
+                            f.write(fundo_user.getbuffer())
+                        with open(caminho_fonte, "wb") as f:
+                            f.write(fonte_user.getbuffer())
                         with open(txt1_path, "w", encoding="utf-8") as f:
                             f.write(l1)
                         with open(txt2_path, "w", encoding="utf-8") as f:
                             f.write(l2)
 
-                        st.write("📐 A calibrar enquadramento e aplicar a fonte...")
+                        st.write("📐 Calibrando enquadramento e aplicando tipografia...")
                         filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
 
-                        draw_l1 = f"drawtext=fontfile='{FONTE_SALVA}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
-                        draw_l2 = f"drawtext=fontfile='{FONTE_SALVA}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
+                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
+                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
 
                         filtro_completo = (
                             f"[0:v]scale=1080:1920[fundo];"
@@ -202,7 +190,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         )
 
                         comando = [
-                            "ffmpeg", "-y", "-i", MOLDE_SALVO, "-i", st.session_state["video_original"],
+                            "ffmpeg", "-y", "-i", caminho_molde, "-i", st.session_state["video_original"],
                             "-filter_complex", filtro_completo,
                             "-map", "[v]", "-map", "1:a?",
                             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac"
@@ -213,7 +201,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                             comando.extend(["-t", mapa_dur[duracao]])
                         comando.append(caminho_saida)
 
-                        st.write("⚙️ A codificar o vídeo final...")
+                        st.write("⚙️ Renderizando vídeo em alta definição...")
                         subprocess.run(comando, check=True)
 
                         status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
@@ -222,7 +210,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         st.balloons()
                         st.success("O corte foi gerado com sucesso!")
                         st.download_button(
-                            label="⬇️ TRANSFERIR VÍDEO PRONTO", 
+                            label="⬇️ BAIXAR VÍDEO PRONTO", 
                             data=f, 
                             file_name="corte_doramax_final.mp4",
                             mime="video/mp4",
