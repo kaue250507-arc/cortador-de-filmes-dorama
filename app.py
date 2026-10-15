@@ -12,11 +12,9 @@ def limpar_legenda_kwai(texto):
     if not texto:
         return ""
     
-    # 1. Trava anti-repetição do Kwai ("Legenda, Autor, Legenda")
     partes = texto.split(',')
     if len(partes) >= 2:
         candidato = partes[0].strip()
-        # Se a primeira parte tiver mais de 10 letras e for repetida no final da frase, guardamos só a primeira
         if len(candidato) > 10 and candidato in texto[len(candidato):]:
             texto = candidato
             
@@ -25,16 +23,11 @@ def limpar_legenda_kwai(texto):
         if len(partes_dois) > 1 and len(partes_dois[1].strip()) > 5:
             texto = partes_dois[1]
 
-    # 2. Remove hashtags, menções e links do Kwai
     texto = re.sub(r'#\S+', '', texto)
     texto = re.sub(r'@\S+', '', texto)
     texto = re.sub(r'https?://\S+', '', texto)
-    
-    # 3. Remove restos de nomes de contas de canais concorrentes
     texto = re.sub(r'(?i)doramas?\s*(brasil|br|oficial|coreano)?', '', texto)
-    texto = re.sub(r'(?i)drosil', '', texto) # Limpa se sobrar "Drosil"
-    
-    # 4. Limpa aspas e parênteses estranhos
+    texto = re.sub(r'(?i)drosil', '', texto)
     texto = texto.replace('"', '').replace("'", "").replace("(", "").replace(")", "")
     
     return " ".join(texto.split()).strip()
@@ -65,23 +58,21 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-# 1. Upload dos ficheiros de estilo
 st.subheader("1. Ficheiros de Estilo")
 col1, col2 = st.columns(2)
 with col1:
-    fundo_user = st.file_uploader("Seu Molde Rosa (JPG/PNG)", type=["jpg", "jpeg", "png"])
+    fundo_user = st.file_uploader("Seu Molde / Fundo (JPG/PNG)", type=["jpg", "jpeg", "png"])
 with col2:
-    fonte_user = st.file_uploader("Sua Fonte TTF (ex: Nexa-Heavy)", type=["ttf"])
+    fonte_user = st.file_uploader("Sua Fonte (TTF)", type=["ttf"])
 
-# 2. Busca do vídeo e da legenda
 st.subheader("2. Vídeo do Kwai")
 link_kwai = st.text_input("Cole o link do Kwai:", placeholder="https://k.kwai.com/p/...")
 
-if st.button("🔍 Buscar Prévia e Legenda"):
+if st.button("🔍 Buscar Vídeo e Legenda Automática"):
     if not link_kwai or not link_kwai.startswith("http"):
         st.warning("Insira um link válido do Kwai.")
     else:
-        with st.spinner("A localizar vídeo e a extrair o texto original..."):
+        with st.spinner("A localizar vídeo e a extrair legenda..."):
             try:
                 req = urllib.request.Request(link_kwai, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
                 with urllib.request.urlopen(req, timeout=12) as resp:
@@ -100,38 +91,30 @@ if st.button("🔍 Buscar Prévia e Legenda"):
                     caminho_preview = os.path.join(pasta_temp, "preview.mp4")
                     urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
                     st.session_state["video_original"] = caminho_preview
-                    st.session_state["legenda_detectada"] = legenda_kwai or "Ela foi confundida com a amante"
-                    st.success("Vídeo e texto detetados com sucesso!")
+                    st.session_state["legenda_detectada"] = legenda_kwai or "ASSISTA ATÉ AO FIM"
+                    st.success("Vídeo e legenda encontrados com sucesso!")
                 else:
                     st.error("Não foi possível carregar o vídeo deste link.")
             except Exception as e:
                 st.error(f"Erro ao ligar ao Kwai: {e}")
 
-# 3. Prévia e Configuração do Corte
 if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
     st.video(st.session_state["video_original"])
 
     st.subheader("3. Personalização do Corte")
     
     texto_final = st.text_input(
-        "Texto de Destaque no Topo (será dividido em 2 linhas automaticamente):", 
+        "Texto de Destaque no Topo:", 
         value=st.session_state.get("legenda_detectada", "")
-    )
-    
-    ajuste_corte = st.radio(
-        "Enquadramento no Molde:",
-        ["✂️ Recortar cena central limpa (Remove faixas pretas e textos antigos)", 
-         "📐 Manter vídeo original sem recorte"],
-        index=0
     )
 
     duracao = st.selectbox("Duração:", ["30s", "50s", "60s", "Original Completo"])
 
-    if st.button("🚀 Gerar Vídeo com Molde e Fonte"):
+    if st.button("🚀 Gerar Vídeo no seu Molde"):
         if not fundo_user or not fonte_user:
-            st.error("Carregue o Molde e a Fonte no Passo 1.")
+            st.error("Por favor, envie o seu Molde e a sua Fonte no Passo 1.")
         else:
-            with st.spinner("A aplicar o molde rosa, recortar faixas e diagramar o texto preto..."):
+            with st.spinner("A renderizar vídeo com a fonte maior e reposicionada..."):
                 l1, l2 = quebrar_duas_linhas(texto_final)
 
                 caminho_molde = os.path.join(pasta_temp, "molde.jpg")
@@ -149,20 +132,18 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 with open(txt2_path, "w", encoding="utf-8") as f:
                     f.write(l2)
 
-                if "Recortar cena central limpa" in ajuste_corte:
-                    filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
-                else:
-                    filtro_video = "[1:v]scale=1080:-2[vid];"
+                filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
 
+                # Ajuste de tamanho (65) e posição Y (mais perto do vídeo)
                 draw_l1 = (
                     f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':"
-                    f"fontcolor=black:fontsize=50:"
-                    f"x=(w-text_w)/2:y=470"
+                    f"fontcolor=black:fontsize=65:"
+                    f"x=(w-text_w)/2:y=500"
                 )
                 draw_l2 = (
                     f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':"
-                    f"fontcolor=black:fontsize=50:"
-                    f"x=(w-text_w)/2:y=545"
+                    f"fontcolor=black:fontsize=65:"
+                    f"x=(w-text_w)/2:y=585"
                 )
 
                 filtro_completo = (
@@ -189,7 +170,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 comando.append(caminho_saida)
                 subprocess.run(comando, check=True)
 
-                st.success("Vídeo finalizado com o seu estilo!")
+                st.success("Vídeo finalizado com sucesso no seu molde!")
                 st.video(caminho_saida)
                 with open(caminho_saida, "rb") as f:
-                    st.download_button("⬇️ Baixar Vídeo Pronto", f, file_name="corte_doramax.mp4")
+                    st.download_button("⬇️ Descarregar Vídeo Pronto", f, file_name="corte_doramax.mp4")
