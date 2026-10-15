@@ -6,10 +6,8 @@ import urllib.request
 import subprocess
 import streamlit as st
 
-# Configuração da página e título da aba
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide")
 
-# Estilos da interface
 st.markdown("""
 <style>
     .stButton>button {
@@ -87,11 +85,12 @@ col_topo_1, col_topo_2 = st.columns([1, 1])
 with col_topo_1:
     with st.container(border=True):
         st.markdown("### 📁 1. Ficheiros de Identidade Visual")
+        st.caption("Ficheiros padrão já integrados. Se quiser alterar o estilo, envie novos ficheiros abaixo:")
         col_molde, col_fonte = st.columns(2)
         with col_molde:
-            fundo_user = st.file_uploader("Upload do Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            fundo_user = st.file_uploader("Substituir Molde (Opcional)", type=["jpg", "jpeg", "png"])
         with col_fonte:
-            fonte_user = st.file_uploader("Upload da Fonte (TTF)", type=["ttf"])
+            fonte_user = st.file_uploader("Substituir Fonte (Opcional)", type=["ttf"])
 
 with col_topo_2:
     with st.container(border=True):
@@ -156,22 +155,36 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             st.markdown('</div>', unsafe_allow_html=True)
 
             if btn_gerar:
-                if not fundo_user or not fonte_user:
-                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de avançar.")
+                # Verificação inteligente: usa o enviado ou recorre ao padrão do repositório
+                caminho_molde = ""
+                caminho_fonte = ""
+
+                if fundo_user:
+                    caminho_molde = os.path.join(pasta_temp, "molde_custom.jpg")
+                    with open(caminho_molde, "wb") as f:
+                        f.write(fundo_user.getbuffer())
+                elif os.path.exists("molde.png"):
+                    caminho_molde = os.path.abspath("molde.png")
+                elif os.path.exists("molde.jpg"):
+                    caminho_molde = os.path.abspath("molde.jpg")
+
+                if fonte_user:
+                    caminho_fonte = os.path.join(pasta_temp, "fonte_custom.ttf")
+                    with open(caminho_fonte, "wb") as f:
+                        f.write(fonte_user.getbuffer())
+                elif os.path.exists("fonte.ttf"):
+                    caminho_fonte = os.path.abspath("fonte.ttf")
+
+                if not caminho_molde or not caminho_fonte:
+                    st.error("⚠️ Não foi encontrado o molde ou a fonte no servidor. Faça o upload manual no Passo 1.")
                 else:
                     with st.status("🎬 A renderizar o corte...", expanded=True) as status:
                         st.write("📥 A preparar os ficheiros base...")
                         l1, l2 = quebrar_duas_linhas(texto_final)
-                        caminho_molde = os.path.join(pasta_temp, "molde.jpg")
-                        caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
                         caminho_saida = os.path.join(pasta_temp, "resultado.mp4")
                         txt1_path = os.path.join(pasta_temp, "l1.txt")
                         txt2_path = os.path.join(pasta_temp, "l2.txt")
 
-                        with open(caminho_molde, "wb") as f:
-                            f.write(fundo_user.getbuffer())
-                        with open(caminho_fonte, "wb") as f:
-                            f.write(fonte_user.getbuffer())
                         with open(txt1_path, "w", encoding="utf-8") as f:
                             f.write(l1)
                         with open(txt2_path, "w", encoding="utf-8") as f:
