@@ -1,3 +1,2 @@
 streamlit
-openai-whisper
-yt-dlp
+google-generativeai
