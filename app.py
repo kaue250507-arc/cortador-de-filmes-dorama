@@ -5,6 +5,7 @@ import html
 import urllib.request
 import subprocess
 import streamlit as st
+import google.generativeai as genai
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide")
 
@@ -72,147 +73,14 @@ def quebrar_duas_linhas(frase):
             menor_dif, melhor_corte = dif, i
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())[:8]
-
-pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
-os.makedirs(pasta_temp, exist_ok=True)
-
-st.markdown("<h1 class='titulo-dash'>🎬 Gerador Filmes/Dorama</h1>", unsafe_allow_html=True)
-
-col_topo_1, col_topo_2 = st.columns([1, 1])
-
-with col_topo_1:
-    with st.container(border=True):
-        st.markdown("### 📁 1. Arquivos de Identidade Visual")
-        col_molde, col_fonte = st.columns(2)
-        with col_molde:
-            fundo_user = st.file_uploader("Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
-        with col_fonte:
-            fonte_user = st.file_uploader("Fonte (TTF)", type=["ttf"])
-
-with col_topo_2:
-    with st.container(border=True):
-        st.markdown("### 🔎 2. Importar do Kwai")
-        link_kwai = st.text_input("Cole o link direto do Kwai aqui:")
-        
-        if st.button("📥 Analisar e Extrair Vídeo", use_container_width=True):
-            if not link_kwai or not link_kwai.startswith("http"):
-                st.warning("⚠️ Insira um link válido do Kwai.")
-            else:
-                with st.spinner("Conectando ao Kwai e baixando vídeo..."):
-                    try:
-                        req = urllib.request.Request(link_kwai, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                        with urllib.request.urlopen(req, timeout=12) as resp:
-                            html_raw = resp.read().decode('utf-8', errors='ignore')
-
-                        legenda_kwai = ""
-                        metas = re.findall(r'<meta[^>]+(?:property|name)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
-                        for m in metas:
-                            limpo = limpar_legenda_kwai(html.unescape(m))
-                            if len(limpo) > 5:
-                                legenda_kwai = limpo
-                                break
-
-                        urls_mp4 = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
-                        if urls_mp4:
-                            caminho_preview = os.path.join(pasta_temp, "preview.mp4")
-                            urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
-                            st.session_state["video_original"] = caminho_preview
-                            st.session_state["legenda_detectada"] = legenda_kwai or "ASSISTA ATÉ AO FIM"
-                            st.toast("✅ Vídeo e legenda importados com sucesso!")
-                        else:
-                            st.error("Não foi possível encontrar o arquivo MP4 no link fornecido.")
-                    except Exception as e:
-                        st.error(f"Erro na ligação ao Kwai: {e}")
-
-st.markdown("---")
-
-if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
-    st.markdown("## 🎛️ Painel de Edição e Renderização")
+def gerar_sinopse_com_ia(chave_api, texto_gancho):
+    genai.configure(api_key=chave_api)
+    modelo = genai.GenerativeModel("gemini-1.5-flash")
     
-    col_preview, col_editor = st.columns([1, 1.2])
-    
-    with col_preview:
-        with st.container(border=True):
-            st.markdown("#### 📺 Pré-visualização Original")
-            st.video(st.session_state["video_original"])
+    prompt = f"""
+    És um especialista em Doramas (K-dramas, C-dramas e J-dramas) e criador de conteúdos virais para Kwai, TikTok e Reels.
+    Com base neste gancho/cena de um dorama: "{texto_gancho}", identifica qual é o dorama (ou sugere o mais provável de acordo com essa cena típica) e cria uma legenda pronta para publicação.
 
-    with col_editor:
-        with st.container(border=True):
-            st.markdown("#### 📝 Ajustes do Corte")
-            texto_final = st.text_input(
-                "Texto de Destaque no Topo (divisão automática em 2 linhas):", 
-                value=st.session_state.get("legenda_detectada", "")
-            )
-            duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            st.markdown('<div class="btn-gerar">', unsafe_allow_html=True)
-            btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            if btn_gerar:
-                if not fundo_user or not fonte_user:
-                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
-                else:
-                    with st.status("🎬 Renderizando o corte...", expanded=True) as status:
-                        st.write("📥 Preparando arquivos da sessão...")
-                        l1, l2 = quebrar_duas_linhas(texto_final)
-                        
-                        caminho_molde = os.path.join(pasta_temp, "molde.jpg")
-                        caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
-                        caminho_saida = os.path.join(pasta_temp, "resultado.mp4")
-                        txt1_path = os.path.join(pasta_temp, "l1.txt")
-                        txt2_path = os.path.join(pasta_temp, "l2.txt")
-
-                        with open(caminho_molde, "wb") as f:
-                            f.write(fundo_user.getbuffer())
-                        with open(caminho_fonte, "wb") as f:
-                            f.write(fonte_user.getbuffer())
-                        with open(txt1_path, "w", encoding="utf-8") as f:
-                            f.write(l1)
-                        with open(txt2_path, "w", encoding="utf-8") as f:
-                            f.write(l2)
-
-                        st.write("📐 Calibrando enquadramento e aplicando tipografia...")
-                        filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
-
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
-
-                        filtro_completo = (
-                            f"[0:v]scale=1080:1920[fundo];"
-                            f"{filtro_video}"
-                            f"[fundo][vid]overlay=0:(H-h)/2[base];"
-                            f"[base]{draw_l1},{draw_l2}[v]"
-                        )
-
-                        comando = [
-                            "ffmpeg", "-y", "-i", caminho_molde, "-i", st.session_state["video_original"],
-                            "-filter_complex", filtro_completo,
-                            "-map", "[v]", "-map", "1:a?",
-                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac"
-                        ]
-
-                        mapa_dur = {"30s": "30", "50s": "50", "60s": "60"}
-                        if duracao in mapa_dur:
-                            comando.extend(["-t", mapa_dur[duracao]])
-                        comando.append(caminho_saida)
-
-                        st.write("⚙️ Renderizando vídeo em alta definição...")
-                        subprocess.run(comando, check=True)
-
-                        status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
-
-                    with open(caminho_saida, "rb") as f:
-                        st.balloons()
-                        st.success("O corte foi gerado com sucesso!")
-                        st.download_button(
-                            label="⬇️ BAIXAR VÍDEO PRONTO", 
-                            data=f, 
-                            file_name="corte_doramax_final.mp4",
-                            mime="video/mp4",
-                            use_container_width=True
-                        )
+    A resposta DEVE seguir rigorosamente esta estrutura:
+    🍿 Nome do Dorama: [Nome em Português e Nome Original entre parênteses]
+    📖 Sinopse
