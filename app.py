@@ -9,32 +9,6 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide")
 
-st.markdown("""
-<style>
-    .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s;
-    }
-    .btn-gerar>button {
-        background-color: #ff4b4b;
-        color: white;
-        border: none;
-        padding: 15px;
-        font-size: 18px;
-    }
-    .btn-gerar>button:hover {
-        background-color: #ff2b2b;
-        transform: scale(1.02);
-    }
-    .titulo-dash {
-        text-align: center;
-        padding-bottom: 20px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 def limpar_legenda_kwai(texto):
     if not texto:
         return ""
@@ -99,7 +73,7 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-st.markdown("<h1 class='titulo-dash'>🎬 Gerador Filmes/Dorama</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; padding-bottom: 20px;'>🎬 Gerador Filmes/Dorama</h1>", unsafe_allow_html=True)
 
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
@@ -143,7 +117,7 @@ with col_topo_2:
                             urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
                             st.session_state["video_original"] = caminho_preview
                             st.session_state["legenda_detectada"] = legenda_kwai or "ASSISTA ATÉ AO FIM"
-                            st.toast("✅ Vídeo e legenda importados com sucesso!")
+                            st.rerun()
                         else:
                             st.error("Não foi possível encontrar o ficheiro MP4 no link fornecido.")
                     except Exception as e:
@@ -165,6 +139,71 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
         with st.container(border=True):
             st.markdown("#### 📝 Ajustes do Corte")
             texto_final = st.text_input(
-                "Texto de Destaque no Topo (divisão automática em 2 linhas):", 
+                "Texto de Destaque no Topo:", 
                 value=st.session_state.get("legenda_detectada", "")
             )
+            duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
+
+            if btn_gerar:
+                if not fundo_user or not fonte_user:
+                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
+                else:
+                    with st.status("🎬 A renderizar o corte...", expanded=True) as status:
+                        st.write("📥 A preparar os ficheiros base...")
+                        l1, l2 = quebrar_duas_linhas(texto_final)
+                        
+                        caminho_molde = os.path.join(pasta_temp, "molde.jpg")
+                        caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
+                        caminho_saida = os.path.join(pasta_temp, "resultado.mp4")
+                        txt1_path = os.path.join(pasta_temp, "l1.txt")
+                        txt2_path = os.path.join(pasta_temp, "l2.txt")
+
+                        with open(caminho_molde, "wb") as f:
+                            f.write(fundo_user.getbuffer())
+                        with open(caminho_fonte, "wb") as f:
+                            f.write(fonte_user.getbuffer())
+                        with open(txt1_path, "w", encoding="utf-8") as f:
+                            f.write(l1)
+                        with open(txt2_path, "w", encoding="utf-8") as f:
+                            f.write(l2)
+
+                        st.write("📐 A calibrar enquadramento e aplicar a fonte...")
+                        filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
+
+                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
+                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
+
+                        filtro_completo = (
+                            f"[0:v]scale=1080:1920[fundo];"
+                            f"{filtro_video}"
+                            f"[fundo][vid]overlay=0:(H-h)/2[base];"
+                            f"[base]{draw_l1},{draw_l2}[v]"
+                        )
+
+                        comando = [
+                            "ffmpeg", "-y", "-i", caminho_molde, "-i", st.session_state["video_original"],
+                            "-filter_complex", filtro_completo,
+                            "-map", "[v]", "-map", "1:a?",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac"
+                        ]
+
+                        mapa_dur = {"30s": "30", "50s": "50", "60s": "60"}
+                        if duracao in mapa_dur:
+                            comando.extend(["-t", mapa_dur[duracao]])
+                        comando.append(caminho_saida)
+
+                        st.write("⚙️ A codificar o vídeo final...")
+                        subprocess.run(comando, check=True)
+
+                        status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
+
+                    with open(caminho_saida, "rb") as f:
+                        st.balloons()
+                        st.success("O corte foi gerado com sucesso!")
+                        st.download_button(
+                            label="⬇️ BAIXAR VÍDEO PRONTO", 
+                            data=f,
