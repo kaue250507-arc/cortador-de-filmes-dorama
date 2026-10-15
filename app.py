@@ -7,7 +7,7 @@ import subprocess
 import streamlit as st
 
 # Configuração da página para ocupar mais espaço na tela e ter um ícone
-st.set_page_config(page_title="DoramaX Pro - Dashboard", page_icon="🎬", layout="wide")
+st.set_page_config(page_title="Cortes Filmes/Dorama - Dashboard", page_icon="🎬", layout="wide")
 
 # CSS Personalizado para deixar o site com cara de software profissional
 st.markdown("""
