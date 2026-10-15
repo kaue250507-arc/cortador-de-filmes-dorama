@@ -21,7 +21,6 @@ def limpar_legenda_kwai(texto):
         p2 = texto.split(":", 1)
         if len(p2) > 1 and len(p2[1].strip()) > 5:
             texto = p2[1]
-
     texto = re.sub(r'#\S+', '', texto)
     texto = re.sub(r'@\S+', '', texto)
     texto = re.sub(r'https?://\S+', '', texto)
@@ -36,7 +35,6 @@ def quebrar_duas_linhas(frase):
         return "ASSISTA ATÉ AO FIM", "MOMENTO SURPREENDENTE"
     if len(palavras) <= 3:
         return frase, ""
-    
     melhor_corte = max(1, len(palavras) // 2)
     menor_dif = float('inf')
     for i in range(1, len(palavras)):
@@ -50,14 +48,13 @@ def quebrar_duas_linhas(frase):
 def gerar_sinopse_com_ia(chave_api, texto_gancho):
     genai.configure(api_key=chave_api)
     modelo = genai.GenerativeModel("gemini-1.5-flash")
-    
     linhas_prompt = [
-        "És um especialista em Doramas e criador de conteúdos virais para redes sociais.",
-        f"Com base neste gancho/cena: '{texto_gancho}', identifica qual é o dorama e cria uma legenda pronta para postar.",
+        "És um especialista em Doramas e criador de conteúdos virais.",
+        f"Com base neste gancho/cena: '{texto_gancho}', identifica o dorama e cria uma legenda pronta para postar.",
         "",
         "Estrutura obrigatória:",
         "🍿 Nome do Dorama: [Nome em Português e Original]",
-        "📖 Sinopse: [Resumo de 2 a 3 linhas instigante, focado na curiosidade, sem spoilers]",
+        "📖 Sinopse: [Resumo de 2 a 3 linhas instigante e sem spoilers]",
         "📺 Onde Assistir: [Ex: Netflix, Viki, Kocowa]",
         "💬 [Pergunta curta para gerar comentários]",
         "",
@@ -92,7 +89,6 @@ with col_topo_2:
     with st.container(border=True):
         st.markdown("### 🔎 2. Importar do Kwai")
         link_kwai = st.text_input("Cole o link direto do Kwai aqui:")
-        
         if st.button("📥 Analisar e Extrair Vídeo", use_container_width=True):
             if not link_kwai or not link_kwai.startswith("http"):
                 st.warning("⚠️ Insira um link válido do Kwai.")
@@ -143,7 +139,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 value=st.session_state.get("legenda_detectada", "")
             )
             duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
-
             st.markdown("<br>", unsafe_allow_html=True)
             
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
@@ -173,7 +168,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                         st.write("📐 A calibrar enquadramento e aplicar a fonte...")
                         filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
-
                         draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
                         draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
 
@@ -198,12 +192,25 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                         st.write("⚙️ A codificar o vídeo final...")
                         subprocess.run(comando, check=True)
-
                         status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
 
-                    with open(caminho_saida, "rb") as f:
+                    with open(caminho_saida, "rb") as f_video:
                         st.balloons()
                         st.success("O corte foi gerado com sucesso!")
-                        st.download_button(
-                            label="⬇️ BAIXAR VÍDEO PRONTO", 
-                            data=f,
+                        st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_doramax_final.mp4", mime="video/mp4", use_container_width=True)
+
+    st.markdown("---")
+    with st.container(border=True):
+        st.markdown("### ✨ Gerador de Sinopse e Legenda para Redes Sociais")
+        st.caption("A IA analisa o gancho do vídeo para estruturar a legenda com nome do dorama, resumo e hashtags.")
+        
+        if st.button("🤖 Gerar Sinopse e Legenda Automática", type="primary", use_container_width=True):
+            if not api_key:
+                st.error("⚠️ Chave GEMINI_API_KEY não encontrada nas configurações.")
+            else:
+                with st.spinner("A analisar o dorama e a criar a legenda magnética..."):
+                    try:
+                        legenda_gerada = gerar_sinopse_com_ia(api_key, texto_final)
+                        st.text_area("📋 Legenda Pronta para Publicar:", value=legenda_gerada, height=220)
+                    except Exception as e:
+                        st.error(f"Erro ao gerar sinopse: {e}")
