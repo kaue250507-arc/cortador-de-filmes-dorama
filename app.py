@@ -5,7 +5,6 @@ import html
 import urllib.request
 import subprocess
 import streamlit as st
-import google.generativeai as genai
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide")
 
@@ -45,26 +44,6 @@ def quebrar_duas_linhas(frase):
             menor_dif, melhor_corte = dif, i
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
-def gerar_sinopse_com_ia(chave_api, texto_gancho):
-    genai.configure(api_key=chave_api)
-    # Aqui está a correção: usando o modelo universal e mais estável
-    modelo = genai.GenerativeModel("gemini-pro")
-    linhas_prompt = [
-        "És um especialista em Doramas e criador de conteúdos virais.",
-        f"Com base neste gancho/cena: '{texto_gancho}', identifica o dorama e cria uma legenda pronta para postar.",
-        "",
-        "Estrutura obrigatória:",
-        "🍿 Nome do Dorama: [Nome em Português e Original]",
-        "📖 Sinopse: [Resumo de 2 a 3 linhas instigante e sem spoilers]",
-        "📺 Onde Assistir: [Ex: Netflix, Viki, Kocowa]",
-        "💬 [Pergunta curta para gerar comentários]",
-        "",
-        "#doramas #kdrama #dorama #dorameira #trechosdedoramas"
-    ]
-    prompt = "\n".join(linhas_prompt)
-    resposta = modelo.generate_content(prompt)
-    return resposta.text
-
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
@@ -72,8 +51,6 @@ pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
 st.markdown("<h1 style='text-align: center; padding-bottom: 20px;'>🎬 Gerador Filmes/Dorama</h1>", unsafe_allow_html=True)
-
-api_key = st.secrets.get("GEMINI_API_KEY", "")
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
@@ -237,19 +214,3 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         st.balloons()
                         st.success("O corte foi gerado com sucesso!")
                         st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_doramax_final.mp4", mime="video/mp4", use_container_width=True)
-
-    st.markdown("---")
-    with st.container(border=True):
-        st.markdown("### ✨ Gerador de Sinopse e Legenda para Redes Sociais")
-        st.caption("A IA analisa o gancho do vídeo para estruturar a legenda com nome do dorama, resumo e hashtags.")
-        
-        if st.button("🤖 Gerar Sinopse e Legenda Automática", type="primary", use_container_width=True):
-            if not api_key:
-                st.error("⚠️ Chave GEMINI_API_KEY não encontrada nas configurações.")
-            else:
-                with st.spinner("A analisar o dorama e a criar a legenda magnética..."):
-                    try:
-                        legenda_gerada = gerar_sinopse_com_ia(api_key, texto_final)
-                        st.text_area("📋 Legenda Pronta para Publicar:", value=legenda_gerada, height=220)
-                    except Exception as e:
-                        st.error(f"Erro ao gerar sinopse: {e}")
