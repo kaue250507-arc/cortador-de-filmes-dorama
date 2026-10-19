@@ -47,7 +47,8 @@ def quebrar_duas_linhas(frase):
 
 def gerar_sinopse_com_ia(chave_api, texto_gancho):
     genai.configure(api_key=chave_api)
-    modelo = genai.GenerativeModel("gemini-1.5-flash")
+    # Modelo atualizado para a versão funcional mais estável da API
+    modelo = genai.GenerativeModel("gemini-1.5-pro-latest")
     linhas_prompt = [
         "És um especialista em Doramas e criador de conteúdos virais.",
         f"Com base neste gancho/cena: '{texto_gancho}', identifica o dorama e cria uma legenda pronta para postar.",
@@ -138,6 +139,10 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 "Texto de Destaque no Topo:", 
                 value=st.session_state.get("legenda_detectada", "")
             )
+            
+            # NOVO SLIDER PARA O TAMANHO DA FONTE
+            tamanho_fonte = st.slider("Tamanho da Fonte (reduza se o texto cortar no telemóvel):", min_value=30, max_value=90, value=65, step=5)
+            
             duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -168,8 +173,12 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                         st.write("📐 A calibrar enquadramento e aplicar a fonte...")
                         filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=500"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize=65:x=(w-text_w)/2:y=585"
+                        
+                        # O TAMANHO DA FONTE AGORA É DINÂMICO BASEADO NO SLIDER DO UTILIZADOR
+                        # A posição y também é ajustada dinamicamente para manter o alinhamento
+                        espacamento = tamanho_fonte + 20
+                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
+                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
 
                         filtro_completo = (
                             f"[0:v]scale=1080:1920[fundo];"
