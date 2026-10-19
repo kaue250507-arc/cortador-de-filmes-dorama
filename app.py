@@ -47,8 +47,8 @@ def quebrar_duas_linhas(frase):
 
 def gerar_sinopse_com_ia(chave_api, texto_gancho):
     genai.configure(api_key=chave_api)
-    # Modelo atualizado para a versão funcional mais estável da API
-    modelo = genai.GenerativeModel("gemini-1.5-pro-latest")
+    # Aqui está a correção: usando o modelo universal e mais estável
+    modelo = genai.GenerativeModel("gemini-pro")
     linhas_prompt = [
         "És um especialista em Doramas e criador de conteúdos virais.",
         f"Com base neste gancho/cena: '{texto_gancho}', identifica o dorama e cria uma legenda pronta para postar.",
@@ -140,9 +140,42 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 value=st.session_state.get("legenda_detectada", "")
             )
             
-            # NOVO SLIDER PARA O TAMANHO DA FONTE
+            # SLIDER DE TAMANHO DA FONTE
             tamanho_fonte = st.slider("Tamanho da Fonte (reduza se o texto cortar no telemóvel):", min_value=30, max_value=90, value=65, step=5)
             
+            # BOTÃO DE PRÉ-VISUALIZAÇÃO DE IMAGEM (RÁPIDO)
+            if st.button("👁️ Pré-visualizar Texto no Molde", use_container_width=True):
+                if not fundo_user or not fonte_user:
+                    st.warning("⚠️ Envie o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
+                else:
+                    with st.spinner("A gerar imagem de teste..."):
+                        l1, l2 = quebrar_duas_linhas(texto_final)
+                        caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
+                        caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
+                        caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
+                        txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
+                        txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
+
+                        with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
+                        with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
+                        with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
+                        with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
+
+                        espacamento = tamanho_fonte + 20
+                        draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
+                        draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
+
+                        filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
+                        comando_prev = [
+                            "ffmpeg", "-y", "-i", caminho_molde_prev,
+                            "-filter_complex", filtro_prev,
+                            "-map", "[v]", "-frames:v", "1", "-update", "1",
+                            caminho_saida_prev
+                        ]
+                        subprocess.run(comando_prev, check=True)
+                        st.image(caminho_saida_prev, caption="Assim ficará o texto no vídeo final:", use_column_width=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
             duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -173,9 +206,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                         st.write("📐 A calibrar enquadramento e aplicar a fonte...")
                         filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
-                        
-                        # O TAMANHO DA FONTE AGORA É DINÂMICO BASEADO NO SLIDER DO UTILIZADOR
-                        # A posição y também é ajustada dinamicamente para manter o alinhamento
                         espacamento = tamanho_fonte + 20
                         draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
                         draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
