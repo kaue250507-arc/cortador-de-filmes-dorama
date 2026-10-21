@@ -4,6 +4,8 @@ import uuid
 import html
 import urllib.request
 import subprocess
+import glob
+import shutil
 import streamlit as st
 
 # Configuração da aba do navegador
@@ -14,17 +16,12 @@ st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout=
 # ==========================================
 st.markdown("""
 <style>
-    /* Esconder elementos padrão do Streamlit */
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Fundo escuro */
-    .stApp {
-        background-color: #0b0f19;
-    }
+    .stApp { background-color: #0b0f19; }
 
-    /* Título com gradiente */
     .titulo-app {
         text-align: center;
         font-size: 2.8rem;
@@ -43,7 +40,6 @@ st.markdown("""
         margin-bottom: 35px;
     }
 
-    /* Cartões / Containers */
     div[data-testid="stContainer"] {
         background-color: #161b22;
         border-radius: 16px !important;
@@ -58,16 +54,9 @@ st.markdown("""
         box-shadow: 0 8px 24px rgba(255, 75, 75, 0.1) !important;
     }
 
-    h3, h4 {
-        color: #e6edf3 !important;
-        font-weight: 700 !important;
-    }
-    label {
-        color: #c9d1d9 !important;
-        font-weight: 600 !important;
-    }
+    h3, h4 { color: #e6edf3 !important; font-weight: 700 !important; }
+    label { color: #c9d1d9 !important; font-weight: 600 !important; }
 
-    /* Botões Padrão */
     div[data-testid="stButton"] button {
         border-radius: 8px;
         font-weight: 600;
@@ -79,7 +68,6 @@ st.markdown("""
         color: #ff4b4b;
     }
 
-    /* Botão Principal com Destaque */
     button[kind="primary"] {
         background: linear-gradient(135deg, #ff4b4b 0%, #ff1f1f 100%) !important;
         color: white !important;
@@ -96,7 +84,6 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(255, 75, 75, 0.6) !important;
     }
 
-    /* Inputs e Caixas de Seleção */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #0d1117 !important;
         color: white !important;
@@ -111,7 +98,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 # ==========================================
 
-def limpar_legenda_kwai(texto):
+def limpar_legenda(texto):
     if not texto:
         return ""
     partes = texto.split(',')
@@ -154,9 +141,8 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-# Título ajustado para Filmes e Doramas
 st.markdown('<div class="titulo-app">🎬 Gerador Filmes/Dorama</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo-app">Cortes automáticos e edição padronizada para Filmes, Séries e Doramas</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitulo-app">Cortes automáticos para vídeos do Kwai, TikTok e Instagram</div>', unsafe_allow_html=True)
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
@@ -171,37 +157,76 @@ with col_topo_1:
 
 with col_topo_2:
     with st.container(border=True):
-        st.markdown("### 🔎 2. Importar do Kwai")
-        link_kwai = st.text_input("Cole o link direto do Kwai aqui:")
+        st.markdown("### 🔎 2. Importar Mídia")
+        link_video = st.text_input("Cole o link (Kwai, TikTok, Insta ou Shorts):")
         if st.button("📥 Analisar e Extrair Vídeo", use_container_width=True):
-            if not link_kwai or not link_kwai.startswith("http"):
-                st.warning("⚠️ Insira um link válido do Kwai.")
+            if not link_video or not link_video.startswith("http"):
+                st.warning("⚠️ Insira um link válido.")
             else:
-                with st.spinner("A estabelecer ligação com o Kwai e a transferir o vídeo..."):
+                with st.spinner("A estabelecer ligação com a plataforma e a transferir o vídeo..."):
                     try:
-                        req = urllib.request.Request(link_kwai, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                        with urllib.request.urlopen(req, timeout=12) as resp:
-                            html_raw = resp.read().decode('utf-8', errors='ignore')
+                        caminho_preview = os.path.join(pasta_temp, "preview.mp4")
+                        legenda_detectada = ""
 
-                        legenda_kwai = ""
-                        metas = re.findall(r'<meta[^>]+(?:property|name)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
-                        for m in metas:
-                            limpo = limpar_legenda_kwai(html.unescape(m))
-                            if len(limpo) > 5:
-                                legenda_kwai = limpo
-                                break
+                        # --- LÓGICA DO KWAI (Mais rápida) ---
+                        if "kwai.com" in link_video or "kwai-video.com" in link_video:
+                            req = urllib.request.Request(link_video, headers={'User-Agent': 'Mozilla/5.0'})
+                            with urllib.request.urlopen(req, timeout=12) as resp:
+                                html_raw = resp.read().decode('utf-8', errors='ignore')
 
-                        urls_mp4 = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
-                        if urls_mp4:
-                            caminho_preview = os.path.join(pasta_temp, "preview.mp4")
-                            urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
-                            st.session_state["video_original"] = caminho_preview
-                            st.session_state["legenda_detectada"] = legenda_kwai or "ASSISTA ATÉ AO FIM"
-                            st.rerun()
+                            metas = re.findall(r'<meta[^>]+(?:property|name)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
+                            for m in metas:
+                                limpo = limpar_legenda(html.unescape(m))
+                                if len(limpo) > 5:
+                                    legenda_detectada = limpo
+                                    break
+
+                            urls_mp4 = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
+                            if urls_mp4:
+                                urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
+                                st.session_state["video_original"] = caminho_preview
+                                st.session_state["legenda_detectada"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
+                                st.rerun()
+                            else:
+                                st.error("Não foi possível encontrar o ficheiro MP4 no link do Kwai.")
+                        
+                        # --- LÓGICA TIKTOK E INSTAGRAM (Usando yt-dlp) ---
                         else:
-                            st.error("Não foi possível encontrar o ficheiro MP4 no link fornecido.")
+                            try:
+                                import yt_dlp
+                            except ImportError:
+                                st.error("⚠️ A biblioteca yt-dlp não está instalada. Certifique-se de que atualizou o ficheiro requirements.txt no GitHub.")
+                                st.stop()
+
+                            ydl_opts = {
+                                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                                'outtmpl': os.path.join(pasta_temp, 'preview_dl.%(ext)s'),
+                                'quiet': True,
+                                'noplaylist': True,
+                            }
+                            
+                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                                info = ydl.extract_info(link_video, download=True)
+                                titulo = info.get('title', '')
+                                desc = info.get('description', '')
+                                texto_bruto = f"{titulo} {desc}"
+                                legenda_detectada = limpar_legenda(texto_bruto)
+                            
+                            # Procura o ficheiro transferido pelo yt-dlp e renomeia
+                            arquivos = glob.glob(os.path.join(pasta_temp, "preview_dl.*"))
+                            if arquivos:
+                                if os.path.exists(caminho_preview):
+                                    os.remove(caminho_preview)
+                                shutil.move(arquivos[0], caminho_preview)
+                                
+                                st.session_state["video_original"] = caminho_preview
+                                st.session_state["legenda_detectada"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
+                                st.rerun()
+                            else:
+                                st.error("Não foi possível transferir o vídeo desta plataforma.")
+                                
                     except Exception as e:
-                        st.error(f"Erro na ligação ao Kwai: {e}")
+                        st.error(f"⚠️ Erro ao aceder ao vídeo. Verifique se é uma conta pública/aberta. Detalhes: {e}")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
