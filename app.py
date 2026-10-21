@@ -12,7 +12,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
-# Desativa tradução automática e personaliza o estilo
+# Desativa tradução automática e personaliza o estilo visual (sem apagão no slider)
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -170,13 +170,6 @@ def tem_audio(caminho_arquivo):
     except Exception:
         return True
 
-PERFIS_MOLDES = {
-    "DoramaX (Principal)": "molde_doramax.jpg",
-    "Canal Sócio 1": "molde_socio1.jpg",
-    "Canal Sócio 2": "molde_socio2.jpg",
-    "Outro / Upload Manual": None
-}
-
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
@@ -191,42 +184,21 @@ st.markdown('<div class="subtitulo-app">Cortes automáticos com Sistema Anti-Cop
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
+# ==========================================
+# PASSO 1: UPLOAD DE IDENTIDADE VISUAL
+# ==========================================
 with col_topo_1:
     with st.container(border=True):
-        st.markdown("### 📁 1. Perfil e Identidade Visual")
-        
-        perfil_escolhido = st.selectbox(
-            "Selecione o seu Canal / Conta:",
-            list(PERFIS_MOLDES.keys())
-        )
-        
-        bytes_molde = None
-        bytes_fonte = None
-        
-        arquivo_perfil = PERFIS_MOLDES[perfil_escolhido]
-        
-        if arquivo_perfil and os.path.exists(arquivo_perfil):
-            with open(arquivo_perfil, "rb") as f:
-                bytes_molde = f.read()
-            st.caption(f"🟢 **Molde ativo:** {perfil_escolhido}")
-        else:
-            if perfil_escolhido != "Outro / Upload Manual":
-                st.caption(f"⚠️ Arquivo `{arquivo_perfil}` não encontrado. Faça o envio abaixo:")
-            fundo_user = st.file_uploader("Enviar Imagem do Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
-            if fundo_user:
-                bytes_molde = fundo_user.getvalue()
+        st.markdown("### 📁 1. Arquivos de Identidade Visual")
+        col_molde, col_fonte = st.columns(2)
+        with col_molde:
+            fundo_user = st.file_uploader("Molde / Layout (PNG/JPG)", type=["jpg", "jpeg", "png"])
+        with col_fonte:
+            fonte_user = st.file_uploader("Fonte (TTF)", type=["ttf", "otf"])
 
-        for fonte_padrao in ["fonte_padrao.ttf", "Nexa-Heavy.ttf"]:
-            if os.path.exists(fonte_padrao):
-                with open(fonte_padrao, "rb") as f:
-                    bytes_fonte = f.read()
-                break
-
-        if not bytes_fonte:
-            fonte_user = st.file_uploader("Enviar Arquivo da Fonte (TTF)", type=["ttf", "otf"])
-            if fonte_user:
-                bytes_fonte = fonte_user.getvalue()
-
+# ==========================================
+# PASSO 2: IMPORTAÇÃO DO VÍDEO
+# ==========================================
 with col_topo_2:
     with st.container(border=True):
         st.markdown("### 🔎 2. Importar Mídia")
@@ -328,6 +300,9 @@ with col_topo_2:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# ==========================================
+# ÁREA DE EDIÇÃO E VISUALIZAÇÃO
+# ==========================================
 if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
     
     col_preview, col_editor = st.columns([1, 1.2])
@@ -374,7 +349,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 opcoes_borda = {"Sem Borda": 0, "Borda Fina": 3, "Borda Marcante": 5}
                 borda_nome = st.selectbox("Contorno / Borda:", list(opcoes_borda.keys()), index=0)
                 largura_borda = opcoes_borda[borda_nome]
-                # Borda contrastante automática
                 cor_borda = "white" if cor_hex == "black" else "black"
 
             # --- CONTROLES DE PRÉ-VISUALIZAÇÃO ---
@@ -388,10 +362,10 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     st.session_state["preview_fixo"] = False
                     st.rerun()
 
-            # RENDERIZAÇÃO DA PRÉ-VISUALIZAÇÃO COM TODAS AS CORES E POSIÇÕES
+            # RENDERIZAÇÃO DA PRÉ-VISUALIZAÇÃO
             if st.session_state.get("preview_fixo", False):
-                if not bytes_molde or not bytes_fonte:
-                    st.info("ℹ️ Selecione um Perfil ou envie o molde no Passo 1 para exibir a imagem.")
+                if not fundo_user or not fonte_user:
+                    st.info("ℹ️ Envie o Molde e a Fonte no Passo 1 para exibir a pré-visualização da imagem.")
                 else:
                     l1, l2 = quebrar_duas_linhas(texto_final)
                     caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
@@ -400,8 +374,8 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
                     txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
 
-                    with open(caminho_molde_prev, "wb") as f: f.write(bytes_molde)
-                    with open(caminho_fonte_prev, "wb") as f: f.write(bytes_fonte)
+                    with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
+                    with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
                     with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
                     with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
 
@@ -442,8 +416,8 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
             if btn_gerar:
-                if not bytes_molde or not bytes_fonte:
-                    st.error("⚠️ Nenhum molde configurado para este perfil.")
+                if not fundo_user or not fonte_user:
+                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar o vídeo.")
                 else:
                     with st.status("🎬 A renderizar o corte...", expanded=True) as status:
                         st.write("📥 A preparar os ficheiros base...")
@@ -456,9 +430,9 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         txt2_path = os.path.join(pasta_temp, "l2.txt")
 
                         with open(caminho_molde, "wb") as f:
-                            f.write(bytes_molde)
+                            f.write(fundo_user.getbuffer())
                         with open(caminho_fonte, "wb") as f:
-                            f.write(bytes_fonte)
+                            f.write(fonte_user.getbuffer())
                         with open(txt1_path, "w", encoding="utf-8") as f:
                             f.write(l1)
                         with open(txt2_path, "w", encoding="utf-8") as f:
@@ -477,7 +451,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                             f"x=(w-text_w)/2:y={posicao_y}+{espacamento}"
                         )
 
-                        # Aplicação do algoritmo Anti-Strike
                         if modo_anti_copyright:
                             filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608,setpts=PTS/1.03[vid];"
                         else:
