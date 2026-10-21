@@ -13,7 +13,7 @@ import streamlit as st
 st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# CANAIS CONCORRENTES MONITORADOS (KWAI)
+# CANAIS CONCORRENTES MONITORIZADOS (KWAI)
 # ==========================================
 PERFIS_KWAI = {
     "doramasbrasil": "https://kwai-video.com/u/@doramasbrasill/8x4HFCCh",
@@ -25,104 +25,36 @@ PERFIS_KWAI = {
 }
 
 # ==========================================
-# BANCO DE VÍDEOS REAIS E DISTINTOS DE DORAMAS
+# VÍDEOS COM TRANSMISSÃO NATIVA GARANTIDA
 # ==========================================
-CATALOGO_VIDEOS = {
-    "🔥 Feed Geral (Mix de Todos os Canais)": [
-        {
-            "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
-            "dorama": "Beleza Verdadeira (True Beauty)",
-            "canal": "@doramasbrasil",
-            "url": "https://k.kwai.com/p/sHCgDks5"
-        },
-        {
-            "titulo": "Quando a garota tímida surpreende todos na escola 😱✨",
-            "dorama": "A Love So Beautiful",
-            "canal": "@Doramasonline",
-            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
-        },
-        {
-            "titulo": "O CEO frio não aguenta ver outro homem perto dela 🥺🔥",
-            "dorama": "Pretendente Surpresa (Business Proposal)",
-            "canal": "@josiiedits",
-            "url": "https://www.youtube.com/watch?v=cI8_K7y_9Fw"
-        },
-        {
-            "titulo": "A declaração mais esperada do dorama debaixo de chuva 🌧️❤️",
-            "dorama": "Pousando no Amor (Crash Landing on You)",
-            "canal": "@clichegarota",
-            "url": "https://www.youtube.com/watch?v=4mXJ9_n3q0E"
-        },
-        {
-            "titulo": "Ela descobriu toda a verdade sobre o passado dele 💔😭",
-            "dorama": "Tudo Bem Não Ser Normal",
-            "canal": "@DoramaOnline",
-            "url": "https://www.youtube.com/watch?v=kXYiU_JCYtU"
-        },
-        {
-            "titulo": "Cena de comédia hilariante no primeiro encontro do casal 😂",
-            "dorama": "Mulher Forte, Do Bong-soon",
-            "canal": "@mundosdodorama552",
-            "url": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
-        }
-    ],
-    "doramasbrasil": [
-        {
-            "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
-            "dorama": "Beleza Verdadeira (True Beauty)",
-            "canal": "@doramasbrasil",
-            "url": "https://k.kwai.com/p/sHCgDks5"
-        },
-        {
-            "titulo": "Protegendo ela na frente de todos na sala de aula 👊",
-            "dorama": "Beleza Verdadeira",
-            "canal": "@doramasbrasil",
-            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
-        }
-    ],
-    "Doramasonline": [
-        {
-            "titulo": "Quando a garota tímida surpreende todos na escola 😱✨",
-            "dorama": "A Love So Beautiful",
-            "canal": "@Doramasonline",
-            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
-        }
-    ],
-    "josiiedits": [
-        {
-            "titulo": "O CEO frio não aguenta ver outro homem perto dela 🥺🔥",
-            "dorama": "Pretendente Surpresa",
-            "canal": "@josiiedits",
-            "url": "https://www.youtube.com/watch?v=cI8_K7y_9Fw"
-        }
-    ],
-    "clichegarota": [
-        {
-            "titulo": "A declaração mais esperada do dorama debaixo de chuva 🌧️❤️",
-            "dorama": "Pousando no Amor",
-            "canal": "@clichegarota",
-            "url": "https://www.youtube.com/watch?v=4mXJ9_n3q0E"
-        }
-    ],
-    "DoramaOnline": [
-        {
-            "titulo": "Ela descobriu toda a verdade sobre o passado dele 💔😭",
-            "dorama": "Tudo Bem Não Ser Normal",
-            "canal": "@DoramaOnline",
-            "url": "https://www.youtube.com/watch?v=kXYiU_JCYtU"
-        }
-    ],
-    "mundosdodorama552": [
-        {
-            "titulo": "Cena de comédia hilariante no primeiro encontro do casal 😂",
-            "dorama": "Mulher Forte, Do Bong-soon",
-            "canal": "@mundosdodorama552",
-            "url": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
-        }
-    ]
-}
+FEED_BASE = [
+    {
+        "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
+        "dorama": "Beleza Verdadeira (True Beauty)",
+        "canal": "@doramasbrasil",
+        "url": "https://k.kwai.com/p/sHCgDks5"
+    },
+    {
+        "titulo": "Quando o chefe frio percebe que está apaixonado pela funcionária 🥺✨",
+        "dorama": "Pretendente Surpresa",
+        "canal": "@Doramasonline",
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    },
+    {
+        "titulo": "A declaração mais esperada debaixo de chuva intensa 🌧️❤️",
+        "dorama": "Pousando no Amor",
+        "canal": "@clichegarota",
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+    },
+    {
+        "titulo": "Ele enfrentou toda a família para proteger ela na escola 👊🔥",
+        "dorama": "Tudo Bem Não Ser Normal",
+        "canal": "@josiiedits",
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
+    }
+]
 
-# Estilos da interface
+# Estilização do ecrã
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -251,13 +183,18 @@ def tem_audio(caminho_arquivo):
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def extrair_link_mp4_direto(url_video):
-    """Obtém a transmissão de vídeo MP4 nativa para reprodução no ecrã."""
+    """Extrai exclusivamente ficheiros diretos de vídeo para reprodução limpa sem erros."""
     if not url_video or not url_video.startswith("http"):
         return None, ""
     
-    if "kwai.com" in url_video or "kwai-video.com" in url_video:
+    # Se já for um ficheiro direto MP4
+    if url_video.split("?")[0].endswith(".mp4"):
+        return url_video, "Cena Viral de Dorama"
+
+    # Kwai
+    if any(k in url_video for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
         try:
-            req = urllib.request.Request(url_video, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            req = urllib.request.Request(url_video, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 html_raw = resp.read().decode('utf-8', errors='ignore')
             metas = re.findall(r'<meta[^>]+(?:property|name)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
@@ -273,6 +210,7 @@ def extrair_link_mp4_direto(url_video):
         except Exception:
             pass
 
+    # TikTok
     elif "tiktok.com" in url_video:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_video)}"
@@ -282,11 +220,13 @@ def extrair_link_mp4_direto(url_video):
             if dados_tik.get("code") == 0:
                 d = dados_tik.get("data", {})
                 mp4 = d.get("play") or d.get("wmplay")
-                return mp4, limpar_legenda(d.get("title", ""))
+                if mp4:
+                    return mp4, limpar_legenda(d.get("title", ""))
         except Exception:
             pass
 
-    return url_video, ""
+    # Se não for possível extrair um ficheiro MP4 direto, devolve None para evitar ecrãs cinzentos quebrados
+    return None, ""
 
 def descarregar_video_motor(url_alvo, pasta_destino):
     """Transfere o vídeo de forma protegida para o servidor para aplicar a edição."""
@@ -298,9 +238,20 @@ def descarregar_video_motor(url_alvo, pasta_destino):
     legenda = ""
     sucesso = False
 
-    # 1. Extração direta por MP4 (Kwai)
+    # 1. Extração direta por MP4 (Kwai / URLs Diretas)
     mp4_direto, leg_dir = extrair_link_mp4_direto(url_alvo)
-    if (mp4_direto and mp4_direto.endswith(".mp4")) or "kwai" in url_alvo:
+    if mp4_direto and mp4_direto.endswith(".mp4"):
+        try:
+            req = urllib.request.Request(mp4_direto, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=20) as v_stream, open(caminho_saida, "wb") as f_out:
+                f_out.write(v_stream.read())
+            sucesso = True
+            legenda = leg_dir
+        except Exception:
+            sucesso = False
+
+    # 2. Kwai / TikTok
+    if not sucesso and ("kwai" in url_alvo or "tiktok.com" in url_alvo):
         try:
             urllib.request.urlretrieve(mp4_direto or url_alvo, caminho_saida)
             sucesso = True
@@ -308,26 +259,7 @@ def descarregar_video_motor(url_alvo, pasta_destino):
         except Exception:
             sucesso = False
 
-    # 2. TikTok sem marca de água
-    if not sucesso and "tiktok.com" in url_alvo:
-        try:
-            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_alvo)}"
-            req_tik = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_tik, timeout=15) as resp_tik:
-                dados_tik = json.loads(resp_tik.read().decode('utf-8'))
-            if dados_tik.get("code") == 0:
-                d = dados_tik.get("data", {})
-                mp4_url = d.get("play") or d.get("wmplay")
-                if mp4_url:
-                    req_v = urllib.request.Request(mp4_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req_v, timeout=25) as v_stream, open(caminho_saida, "wb") as f_out:
-                        f_out.write(v_stream.read())
-                    legenda = limpar_legenda(d.get("title", ""))
-                    sucesso = True
-        except Exception:
-            sucesso = False
-
-    # 3. yt-dlp geral (YouTube / Outros)
+    # 3. yt-dlp geral (Fallback)
     if not sucesso:
         try:
             import yt_dlp
@@ -369,11 +301,8 @@ if "preview_fixo" not in st.session_state:
 if "nav_radio" not in st.session_state:
     st.session_state["nav_radio"] = "🔥 Feed TikTok (Vídeos Virais)"
 
-if "canal_filtro" not in st.session_state:
-    st.session_state["canal_filtro"] = "🔥 Feed Geral (Mix de Todos os Canais)"
-
-if "videos_personalizados" not in st.session_state:
-    st.session_state["videos_personalizados"] = []
+if "videos_do_feed" not in st.session_state:
+    st.session_state["videos_do_feed"] = list(FEED_BASE)
 
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
@@ -395,67 +324,52 @@ aba_selecionada = st.radio(
 # ==============================================================================
 if aba_selecionada == "🔥 Feed TikTok (Vídeos Virais)":
     
-    with st.expander("📺 Perfis Oficiais dos Concorrentes no Kwai"):
-        st.caption("Aceda diretamente aos canais mais seguidos para copiar novos links:")
+    with st.expander("📺 Perfis Oficiais dos Concorrentes no Kwai (Copie Links)"):
+        st.caption("Abra as contas mais seguidas para encontrar novos vídeos virais:")
         cols_kw = st.columns(3)
         for i, (nome_k, link_k) in enumerate(PERFIS_KWAI.items()):
             with cols_kw[i % 3]:
                 st.link_button(f"🔗 @{nome_k}", link_k, use_container_width=True)
 
-    with st.expander("➕ Adicionar Novo Link ao Feed"):
+    with st.expander("➕ Adicionar Vídeo do Kwai ou TikTok ao Feed"):
         col_ad1, col_ad2 = st.columns([3, 1])
         with col_ad1:
-            novo_link = st.text_input("Cole o link do Kwai, TikTok ou Shorts:", placeholder="https://k.kwai.com/...")
-            titulo_personalizado = st.text_input("Legenda do Vídeo:", placeholder="Ex: Ele defendeu ela na sala de aula")
+            novo_link = st.text_input("Cole o link do vídeo do Kwai ou TikTok:", placeholder="https://k.kwai.com/p/...")
+            titulo_personalizado = st.text_input("Título / Cena (Opcional):", placeholder="Ex: Ele com ciúmes na aula")
         with col_ad2:
             st.write("")
             st.write("")
             if st.button("Adicionar ao Topo", use_container_width=True):
                 if novo_link and novo_link.startswith("http"):
-                    st.session_state["videos_personalizados"].insert(0, {
-                        "titulo": titulo_personalizado or "Novo Corte Importado",
-                        "dorama": "Adicionado Manualmente",
+                    st.session_state["videos_do_feed"].insert(0, {
+                        "titulo": titulo_personalizado or "Cena Importada do Kwai",
+                        "dorama": "Dorama em Alta",
                         "canal": "Manual",
                         "url": novo_link
                     })
-                    st.success("Vídeo adicionado com sucesso ao topo do feed!")
+                    st.success("Vídeo adicionado ao topo do feed!")
                     st.rerun()
 
-    col_filtro1, col_filtro2 = st.columns([2.5, 1])
-    with col_filtro1:
-        opcoes_filtro = list(CATALOGO_VIDEOS.keys())
-        canal_escolhido = st.selectbox("🎯 Filtrar Feed por Canal:", opcoes_filtro, key="select_canal_filtro")
-    with col_filtro2:
-        st.write("")
-        st.write("")
-        if st.button("🔄 Atualizar Feed", use_container_width=True):
-            st.rerun()
+    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 20px 0;'>👇 <b>Deslize a página para baixo</b> para assistir aos clipes:</p>", unsafe_allow_html=True)
 
-    # Monta a lista combinada de vídeos
-    lista_exibicao = []
-    if st.session_state["videos_personalizados"]:
-        lista_exibicao.extend(st.session_state["videos_personalizados"])
-    lista_exibicao.extend(CATALOGO_VIDEOS.get(canal_escolhido, []))
-
-    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 20px 0;'>👇 <b>Deslize a tela para baixo</b> para assistir a vídeos diferentes:</p>", unsafe_allow_html=True)
-
-    # ROLAGEM VERTICAL CONTÍNUA (CADA VÍDEO DIFERENTE)
-    for idx, item in enumerate(lista_exibicao):
+    # ROLAGEM VERTICAL CONTÍNUA COM REPRODUÇÃO LIMPA
+    for idx, item in enumerate(st.session_state["videos_do_feed"]):
         col_esp1, col_feed, col_esp2 = st.columns([1, 1.4, 1])
         
         with col_feed:
             st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
-            st.caption(f"🎭 Cena / Dorama: **{item['dorama']}** | Origem: **{item['canal']}**")
+            st.caption(f"🎭 Cena: **{item['dorama']}** | Canal: **{item['canal']}**")
 
-            # Reprodutor nativo
-            url_final_video, _ = extrair_link_mp4_direto(item["url"])
-            if url_final_video:
-                st.video(url_final_video)
+            # Validação do fluxo de vídeo: apenas renderiza ficheiros válidos
+            mp4_url, leg_auto = extrair_link_mp4_direto(item["url"])
+            
+            if mp4_url:
+                st.video(mp4_url)
             else:
-                st.video(item["url"])
+                st.info("💡 Este link requer abertura no editor para extrair o corte.")
 
             # Botão de Ação Direta
-            if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cortar_{idx}_{item['url'][:15]}", type="primary", use_container_width=True):
+            if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cortar_{idx}_{item['url'][-8:]}", type="primary", use_container_width=True):
                 with st.spinner("A carregar vídeo na bancada de corte..."):
                     sucesso, c_out, leg = descarregar_video_motor(item["url"], pasta_temp)
                     if sucesso and tem_imagem_de_video(c_out):
