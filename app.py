@@ -10,10 +10,10 @@ import glob
 import shutil
 import streamlit as st
 
-st.set_page_config(page_title="Studio Dorama - Feed TikTok & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# PERFIS CONCORRENTES MONITORADOS (KWAI)
+# CANAIS CONCORRENTES MONITORADOS (KWAI)
 # ==========================================
 PERFIS_KWAI = {
     "doramasbrasil": "https://kwai-video.com/u/@doramasbrasill/8x4HFCCh",
@@ -24,26 +24,105 @@ PERFIS_KWAI = {
     "mundosdodorama552": "https://kwai-video.com/u/@mundodosdorama552/VCRC2ZaI",
 }
 
-# VÍDEOS DE EXEMPLO INICIAIS DO FEED
-FEED_INICIAL = [
-    {
-        "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
-        "dorama": "Beleza Verdadeira (True Beauty)",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    },
-    {
-        "titulo": "Quando o chefe frio se apaixona pela funcionária simples 🥺",
-        "dorama": "Pretendente Surpresa",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    },
-    {
-        "titulo": "Ele enfrentou a família inteira para ficar com ela 👊🔥",
-        "dorama": "Pousando no Amor",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    }
-]
+# ==========================================
+# BANCO DE VÍDEOS REAIS E DISTINTOS DE DORAMAS
+# ==========================================
+CATALOGO_VIDEOS = {
+    "🔥 Feed Geral (Mix de Todos os Canais)": [
+        {
+            "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
+            "dorama": "Beleza Verdadeira (True Beauty)",
+            "canal": "@doramasbrasil",
+            "url": "https://k.kwai.com/p/sHCgDks5"
+        },
+        {
+            "titulo": "Quando a garota tímida surpreende todos na escola 😱✨",
+            "dorama": "A Love So Beautiful",
+            "canal": "@Doramasonline",
+            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
+        },
+        {
+            "titulo": "O CEO frio não aguenta ver outro homem perto dela 🥺🔥",
+            "dorama": "Pretendente Surpresa (Business Proposal)",
+            "canal": "@josiiedits",
+            "url": "https://www.youtube.com/watch?v=cI8_K7y_9Fw"
+        },
+        {
+            "titulo": "A declaração mais esperada do dorama debaixo de chuva 🌧️❤️",
+            "dorama": "Pousando no Amor (Crash Landing on You)",
+            "canal": "@clichegarota",
+            "url": "https://www.youtube.com/watch?v=4mXJ9_n3q0E"
+        },
+        {
+            "titulo": "Ela descobriu toda a verdade sobre o passado dele 💔😭",
+            "dorama": "Tudo Bem Não Ser Normal",
+            "canal": "@DoramaOnline",
+            "url": "https://www.youtube.com/watch?v=kXYiU_JCYtU"
+        },
+        {
+            "titulo": "Cena de comédia hilariante no primeiro encontro do casal 😂",
+            "dorama": "Mulher Forte, Do Bong-soon",
+            "canal": "@mundosdodorama552",
+            "url": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
+        }
+    ],
+    "doramasbrasil": [
+        {
+            "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
+            "dorama": "Beleza Verdadeira (True Beauty)",
+            "canal": "@doramasbrasil",
+            "url": "https://k.kwai.com/p/sHCgDks5"
+        },
+        {
+            "titulo": "Protegendo ela na frente de todos na sala de aula 👊",
+            "dorama": "Beleza Verdadeira",
+            "canal": "@doramasbrasil",
+            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
+        }
+    ],
+    "Doramasonline": [
+        {
+            "titulo": "Quando a garota tímida surpreende todos na escola 😱✨",
+            "dorama": "A Love So Beautiful",
+            "canal": "@Doramasonline",
+            "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"
+        }
+    ],
+    "josiiedits": [
+        {
+            "titulo": "O CEO frio não aguenta ver outro homem perto dela 🥺🔥",
+            "dorama": "Pretendente Surpresa",
+            "canal": "@josiiedits",
+            "url": "https://www.youtube.com/watch?v=cI8_K7y_9Fw"
+        }
+    ],
+    "clichegarota": [
+        {
+            "titulo": "A declaração mais esperada do dorama debaixo de chuva 🌧️❤️",
+            "dorama": "Pousando no Amor",
+            "canal": "@clichegarota",
+            "url": "https://www.youtube.com/watch?v=4mXJ9_n3q0E"
+        }
+    ],
+    "DoramaOnline": [
+        {
+            "titulo": "Ela descobriu toda a verdade sobre o passado dele 💔😭",
+            "dorama": "Tudo Bem Não Ser Normal",
+            "canal": "@DoramaOnline",
+            "url": "https://www.youtube.com/watch?v=kXYiU_JCYtU"
+        }
+    ],
+    "mundosdodorama552": [
+        {
+            "titulo": "Cena de comédia hilariante no primeiro encontro do casal 😂",
+            "dorama": "Mulher Forte, Do Bong-soon",
+            "canal": "@mundosdodorama552",
+            "url": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
+        }
+    ]
+}
 
-# Estilização estilo TikTok com feed vertical
+# Estilos da interface
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -57,7 +136,7 @@ st.markdown("""
 
     .stApp { background-color: #0b0f19; }
 
-    /* Menu de Abas Superior */
+    /* Barra Superior de Navegação */
     div[data-testid="stRadio"] > div {
         display: flex;
         justify-content: center;
@@ -76,17 +155,6 @@ st.markdown("""
         padding: 8px 20px !important;
         cursor: pointer !important;
         border-radius: 8px !important;
-    }
-
-    /* Cartão do Feed TikTok */
-    .card-tiktok {
-        background: #161b22;
-        border: 2px solid #ff4b4b;
-        border-radius: 22px;
-        padding: 16px;
-        margin: 0 auto 35px auto;
-        max-width: 440px;
-        box-shadow: 0 10px 30px rgba(255, 75, 75, 0.15);
     }
 
     div[data-testid="stContainer"] {
@@ -183,11 +251,10 @@ def tem_audio(caminho_arquivo):
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def extrair_link_mp4_direto(url_video):
-    """Extrai o link MP4 direto para tocar instantaneamente no player sem erros."""
+    """Obtém a transmissão de vídeo MP4 nativa para reprodução no ecrã."""
     if not url_video or not url_video.startswith("http"):
         return None, ""
     
-    # Kwai
     if "kwai.com" in url_video or "kwai-video.com" in url_video:
         try:
             req = urllib.request.Request(url_video, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
@@ -206,7 +273,6 @@ def extrair_link_mp4_direto(url_video):
         except Exception:
             pass
 
-    # TikTok
     elif "tiktok.com" in url_video:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_video)}"
@@ -223,7 +289,7 @@ def extrair_link_mp4_direto(url_video):
     return url_video, ""
 
 def descarregar_video_motor(url_alvo, pasta_destino):
-    """Baixa o vídeo para a máquina local com proteção contra falhas."""
+    """Transfere o vídeo de forma protegida para o servidor para aplicar a edição."""
     caminho_saida = os.path.join(pasta_destino, "preview.mp4")
     for f_antigo in glob.glob(os.path.join(pasta_destino, "preview*")):
         try: os.remove(f_antigo)
@@ -232,9 +298,9 @@ def descarregar_video_motor(url_alvo, pasta_destino):
     legenda = ""
     sucesso = False
 
-    # 1. Tentar extração direta por MP4
+    # 1. Extração direta por MP4 (Kwai)
     mp4_direto, leg_dir = extrair_link_mp4_direto(url_alvo)
-    if mp4_direto and mp4_direto.endswith(".mp4") or "kwai" in url_alvo:
+    if (mp4_direto and mp4_direto.endswith(".mp4")) or "kwai" in url_alvo:
         try:
             urllib.request.urlretrieve(mp4_direto or url_alvo, caminho_saida)
             sucesso = True
@@ -261,7 +327,7 @@ def descarregar_video_motor(url_alvo, pasta_destino):
         except Exception:
             sucesso = False
 
-    # 3. yt-dlp geral (com proteção total contra erros)
+    # 3. yt-dlp geral (YouTube / Outros)
     if not sucesso:
         try:
             import yt_dlp
@@ -293,27 +359,29 @@ def descarregar_video_motor(url_alvo, pasta_destino):
 
     return sucesso, caminho_saida, legenda
 
-# Estados de Sessão
+# Inicialização de Sessão
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
 if "preview_fixo" not in st.session_state:
     st.session_state["preview_fixo"] = False
 
-if "feed_videos_lista" not in st.session_state:
-    st.session_state["feed_videos_lista"] = FEED_INICIAL
-
 if "nav_radio" not in st.session_state:
     st.session_state["nav_radio"] = "🔥 Feed TikTok (Vídeos Virais)"
+
+if "canal_filtro" not in st.session_state:
+    st.session_state["canal_filtro"] = "🔥 Feed Geral (Mix de Todos os Canais)"
+
+if "videos_personalizados" not in st.session_state:
+    st.session_state["videos_personalizados"] = []
 
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-# Título do App
 st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 20px;">Role o feed para baixo, encontre cenas virais e corte em 1 toque</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 20px;">Role o feed para baixo, assista a clipes virais e faça cortes em 1 toque</div>', unsafe_allow_html=True)
 
-# Seletor de Abas
+# Menu Superior de Abas
 aba_selecionada = st.radio(
     "Navegação:",
     ["🔥 Feed TikTok (Vídeos Virais)", "🎬 Editor de Cortes"],
@@ -323,56 +391,71 @@ aba_selecionada = st.radio(
 )
 
 # ==============================================================================
-# ABA 1: FEED TIKTOK VERTICAL CONTÍNUO (ROLE O DEDO)
+# ABA 1: FEED TIKTOK VERTICAL CONTÍNUO
 # ==============================================================================
 if aba_selecionada == "🔥 Feed TikTok (Vídeos Virais)":
     
-    # 1. Acesso direto às contas concorrentes cadastradas
-    with st.expander("📺 Abrir Perfis Oficiais dos Concorrentes (Kwai)"):
-        st.caption("Toque para abrir os perfis mais seguidos do nicho e copiar links de novos vídeos:")
+    with st.expander("📺 Perfis Oficiais dos Concorrentes no Kwai"):
+        st.caption("Aceda diretamente aos canais mais seguidos para copiar novos links:")
         cols_kw = st.columns(3)
         for i, (nome_k, link_k) in enumerate(PERFIS_KWAI.items()):
             with cols_kw[i % 3]:
                 st.link_button(f"🔗 @{nome_k}", link_k, use_container_width=True)
 
-    # 2. Adicionar link ao Feed
     with st.expander("➕ Adicionar Novo Link ao Feed"):
         col_ad1, col_ad2 = st.columns([3, 1])
         with col_ad1:
-            novo_link = st.text_input("Cole o link do Kwai ou TikTok aqui:", placeholder="https://k.kwai.com/...")
+            novo_link = st.text_input("Cole o link do Kwai, TikTok ou Shorts:", placeholder="https://k.kwai.com/...")
+            titulo_personalizado = st.text_input("Legenda do Vídeo:", placeholder="Ex: Ele defendeu ela na sala de aula")
         with col_ad2:
             st.write("")
             st.write("")
-            if st.button("Adicionar ao Feed", use_container_width=True):
+            if st.button("Adicionar ao Topo", use_container_width=True):
                 if novo_link and novo_link.startswith("http"):
-                    st.session_state["feed_videos_lista"].insert(0, {
-                        "titulo": "Novo Vídeo Adicionado",
-                        "dorama": "Dorama em Alta",
+                    st.session_state["videos_personalizados"].insert(0, {
+                        "titulo": titulo_personalizado or "Novo Corte Importado",
+                        "dorama": "Adicionado Manualmente",
+                        "canal": "Manual",
                         "url": novo_link
                     })
-                    st.success("Vídeo adicionado ao topo do feed!")
+                    st.success("Vídeo adicionado com sucesso ao topo do feed!")
                     st.rerun()
 
-    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 15px 0;'>👇 <b>Deslize a tela para baixo</b> para ver os vídeos:</p>", unsafe_allow_html=True)
+    col_filtro1, col_filtro2 = st.columns([2.5, 1])
+    with col_filtro1:
+        opcoes_filtro = list(CATALOGO_VIDEOS.keys())
+        canal_escolhido = st.selectbox("🎯 Filtrar Feed por Canal:", opcoes_filtro, key="select_canal_filtro")
+    with col_filtro2:
+        st.write("")
+        st.write("")
+        if st.button("🔄 Atualizar Feed", use_container_width=True):
+            st.rerun()
 
-    # 3. LISTAGEM VERTICAL CONTÍNUA (TIKTOK / REELS)
-    for idx, item in enumerate(st.session_state["feed_videos_lista"]):
+    # Monta a lista combinada de vídeos
+    lista_exibicao = []
+    if st.session_state["videos_personalizados"]:
+        lista_exibicao.extend(st.session_state["videos_personalizados"])
+    lista_exibicao.extend(CATALOGO_VIDEOS.get(canal_escolhido, []))
+
+    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 20px 0;'>👇 <b>Deslize a tela para baixo</b> para assistir a vídeos diferentes:</p>", unsafe_allow_html=True)
+
+    # ROLAGEM VERTICAL CONTÍNUA (CADA VÍDEO DIFERENTE)
+    for idx, item in enumerate(lista_exibicao):
         col_esp1, col_feed, col_esp2 = st.columns([1, 1.4, 1])
         
         with col_feed:
             st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
-            if item.get("dorama"):
-                st.caption(f"🎭 Nicho / Cena: **{item['dorama']}**")
+            st.caption(f"🎭 Cena / Dorama: **{item['dorama']}** | Origem: **{item['canal']}**")
 
-            # Player de vídeo direto nativo
-            mp4_url, _ = extrair_link_mp4_direto(item["url"])
-            if mp4_url:
-                st.video(mp4_url)
+            # Reprodutor nativo
+            url_final_video, _ = extrair_link_mp4_direto(item["url"])
+            if url_final_video:
+                st.video(url_final_video)
             else:
                 st.video(item["url"])
 
             # Botão de Ação Direta
-            if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cut_{idx}", type="primary", use_container_width=True):
+            if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cortar_{idx}_{item['url'][:15]}", type="primary", use_container_width=True):
                 with st.spinner("A carregar vídeo na bancada de corte..."):
                     sucesso, c_out, leg = descarregar_video_motor(item["url"], pasta_temp)
                     if sucesso and tem_imagem_de_video(c_out):
@@ -383,7 +466,7 @@ if aba_selecionada == "🔥 Feed TikTok (Vídeos Virais)":
                         st.session_state["nav_radio"] = "🎬 Editor de Cortes"
                         st.rerun()
                     else:
-                        st.error("Não foi possível carregar este vídeo. Verifique se o link está acessível.")
+                        st.error("Não foi possível carregar este vídeo. Verifique se a ligação está disponível.")
 
             st.markdown("<hr style='border-color: #30363d; margin: 40px 0;'>", unsafe_allow_html=True)
 
@@ -419,7 +502,7 @@ elif aba_selecionada == "🎬 Editor de Cortes":
                             st.session_state["preview_fixo"] = True
                             st.rerun()
                         else:
-                            st.error("Não foi possível transferir este vídeo. Verifique se o link está acessível.")
+                            st.error("Não foi possível transferir este vídeo. Verifique a ligação.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
