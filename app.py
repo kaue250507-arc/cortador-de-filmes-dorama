@@ -10,7 +10,7 @@ import glob
 import shutil
 import streamlit as st
 
-st.set_page_config(page_title="Studio Dorama - Radar & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
 # PERFIS MONITORADOS (KWAI DORAMA)
@@ -24,7 +24,7 @@ PERFIS_KWAI = {
     "mundosdodorama552": "https://kwai-video.com/u/@mundodosdorama552/VCRC2ZaI",
 }
 
-# Desativa tradução automática e personaliza o estilo visual
+# Desativa tradução automática e estiliza o feed estilo TikTok
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -65,19 +65,28 @@ st.markdown("""
         text-align: center;
         color: #8b949e;
         font-size: 1rem;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
     }
 
-    /* Estilização das Abas */
-    button[data-baseweb="tab"] {
-        font-size: 1.15rem !important;
-        font-weight: 700 !important;
-        color: #8b949e !important;
-        padding: 12px 24px !important;
+    /* Menu de Abas Superior Moderno */
+    div[data-testid="stRadio"] > div {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        background: #161b22;
+        padding: 10px 15px;
+        border-radius: 14px;
+        border: 1px solid #30363d;
+        margin-bottom: 25px;
     }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #ff4b4b !important;
-        border-bottom-color: #ff4b4b !important;
+    div[data-testid="stRadio"] label {
+        background: transparent !important;
+        color: #c9d1d9 !important;
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        padding: 6px 16px !important;
+        cursor: pointer !important;
+        border-radius: 8px !important;
     }
 
     div[data-testid="stContainer"] {
@@ -101,7 +110,7 @@ st.markdown("""
         border: none !important;
         border-radius: 10px !important;
         padding: 12px 0 !important;
-        font-size: 1rem !important;
+        font-size: 1.05rem !important;
         text-transform: uppercase;
         letter-spacing: 1px;
         box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4) !important;
@@ -177,9 +186,9 @@ def tem_audio(caminho_arquivo):
     except Exception:
         return True
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def buscar_videos_radar(query_termo):
-    """Busca vídeos virais de doramas no formato Shorts sem necessidade de API externa."""
+@st.cache_data(ttl=3600, show_spinner=False)
+def buscar_videos_feed_tiktok(termo_pesquisa):
+    """Busca os IDs dos shorts de doramas mais assistidos para exibir no player TikTok."""
     import yt_dlp
     ydl_opts = {
         'extract_flat': True,
@@ -190,23 +199,34 @@ def buscar_videos_radar(query_termo):
     videos = []
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch8:{query_termo} dorama shorts", download=False)
+            query = f"ytsearch15:{termo_pesquisa} dorama shorts"
+            info = ydl.extract_info(query, download=False)
             entries = info.get('entries', []) if info else []
             for item in entries:
                 if not item:
                     continue
                 v_id = item.get('id')
-                v_url = f"https://www.youtube.com/watch?v={v_id}" if v_id else item.get('url')
-                v_title = item.get('title') or "Cena de Dorama"
-                v_thumb = item.get('thumbnail') or (f"https://i.ytimg.com/vi/{v_id}/hqdefault.jpg" if v_id else None)
-                if v_url:
-                    videos.append({"title": v_title, "url": v_url, "thumb": v_thumb})
+                v_title = item.get('title') or "Cena Incrível de Dorama"
+                if v_id:
+                    videos.append({
+                        "id": v_id,
+                        "title": v_title,
+                        "url": f"https://www.youtube.com/watch?v={v_id}"
+                    })
     except Exception:
         pass
+    
+    # Lista de segurança garantida caso a busca do YouTube demore
+    if not videos:
+        videos = [
+            {"id": "a93e3B2RjYg", "title": "Ele ficou com ciúmes ao ver ela com outro", "url": "https://www.youtube.com/watch?v=a93e3B2RjYg"},
+            {"id": "cI8_K7y_9Fw", "title": "Quando ele descobre a verdade sobre ela", "url": "https://www.youtube.com/watch?v=cI8_K7y_9Fw"},
+            {"id": "4mXJ9_n3q0E", "title": "Momento fofo do casal no dorama", "url": "https://www.youtube.com/watch?v=4mXJ9_n3q0E"},
+        ]
     return videos
 
 def descarregar_video_motor(url_alvo, pasta_destino):
-    """Motor unificado de download com suporte a Kwai, TikTok, Insta e YouTube."""
+    """Motor de download com proteção anti-bloqueio para servidores em nuvem."""
     caminho_saida = os.path.join(pasta_destino, "preview.mp4")
     for f_antigo in glob.glob(os.path.join(pasta_destino, "preview*")):
         try: os.remove(f_antigo)
@@ -215,10 +235,10 @@ def descarregar_video_motor(url_alvo, pasta_destino):
     legenda = ""
     sucesso = False
 
-    # 1. Kwai direto
+    # 1. Kwai
     if "kwai.com" in url_alvo or "kwai-video.com" in url_alvo:
         try:
-            req = urllib.request.Request(url_alvo, headers={'User-Agent': 'Mozilla/5.0'})
+            req = urllib.request.Request(url_alvo, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
             with urllib.request.urlopen(req, timeout=12) as resp:
                 html_raw = resp.read().decode('utf-8', errors='ignore')
 
@@ -236,7 +256,7 @@ def descarregar_video_motor(url_alvo, pasta_destino):
         except Exception:
             sucesso = False
 
-    # 2. TikTok sem marca de água
+    # 2. TikTok
     elif "tiktok.com" in url_alvo:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_alvo)}"
@@ -255,107 +275,168 @@ def descarregar_video_motor(url_alvo, pasta_destino):
         except Exception:
             sucesso = False
 
-    # 3. Motor Geral (yt-dlp)
+    # 3. YouTube / Motor Geral (com cliente mobile para evitar bloqueio 403)
     if not sucesso:
         import yt_dlp
         ydl_opts = {
-            'format': 'bv*[height>0]+ba/b[height>0]/best[height>0]',
+            'format': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
             'merge_output_format': 'mp4',
             'outtmpl': os.path.join(pasta_destino, 'preview_dl.%(ext)s'),
             'quiet': True,
+            'no_warnings': True,
             'noplaylist': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios'],
+                    'player_skip': ['webpage', 'configs']
+                }
+            }
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url_alvo, download=True)
-            if not legenda:
-                legenda = limpar_legenda(f"{info.get('title', '')} {info.get('description', '')}")
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url_alvo, download=True)
+                if not legenda:
+                    legenda = limpar_legenda(f"{info.get('title', '')} {info.get('description', '')}")
 
-        arquivos = glob.glob(os.path.join(pasta_destino, "preview_dl.*"))
-        if arquivos:
-            arq_orig = arquivos[0]
-            if not arq_orig.endswith(".mp4"):
-                subprocess.run(["ffmpeg", "-y", "-i", arq_orig, "-c", "copy", caminho_saida], check=True)
-                try: os.remove(arq_orig)
-                except Exception: pass
-            else:
-                shutil.move(arq_orig, caminho_saida)
-            sucesso = True
+            arquivos = glob.glob(os.path.join(pasta_destino, "preview_dl.*"))
+            if arquivos:
+                arq_orig = arquivos[0]
+                if not arq_orig.endswith(".mp4"):
+                    subprocess.run(["ffmpeg", "-y", "-i", arq_orig, "-c", "copy", caminho_saida], check=True)
+                    try: os.remove(arq_orig)
+                    except Exception: pass
+                else:
+                    shutil.move(arq_orig, caminho_saida)
+                sucesso = True
+        except Exception:
+            sucesso = False
 
     return sucesso, caminho_saida, legenda
 
-# Inicialização de Sessão
+# Estados de Sessão
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
 if "preview_fixo" not in st.session_state:
     st.session_state["preview_fixo"] = False
 
+if "feed_index" not in st.session_state:
+    st.session_state["feed_index"] = 0
+
+if "nav_radio" not in st.session_state:
+    st.session_state["nav_radio"] = "🔥 Feed de Vídeos (Estilo TikTok)"
+
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-st.markdown('<div class="titulo-app">🎬 Studio Dorama: Radar & Cortes</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo-app">Encontre cenas virais nas redes e gere cortes automáticos profissionais</div>', unsafe_allow_html=True)
+st.markdown('<div class="titulo-app">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitulo-app">Assista a vídeos virais no estilo TikTok e crie cortes profissionais</div>', unsafe_allow_html=True)
 
-# CRIAÇÃO DAS DUAS ABAS PRINCIPAIS
-aba_radar, aba_editor = st.tabs(["🔥 Radar de Vídeos (Mineração)", "🎬 Editor de Cortes"])
+# Menu Superior de Navegação
+aba_selecionada = st.radio(
+    "Navegação:",
+    ["🔥 Feed de Vídeos (Estilo TikTok)", "🎬 Editor de Cortes"],
+    key="nav_radio",
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
 # ==============================================================================
-# ABA 1: RADAR DE VÍDEOS (MINERAÇÃO)
+# ABA 1: FEED ESTILO TIKTOK
 # ==============================================================================
-with aba_radar:
-    st.markdown("### 🕵️ 1. Contas Concorrentes Cadastradas (Kwai)")
-    st.caption("Acesse diretamente os maiores canais de doramas para copiar os links dos vídeos que já estão viralizando:")
+if aba_selecionada == "🔥 Feed de Vídeos (Estilo TikTok)":
     
-    cols_contas = st.columns(3)
-    idx_col = 0
-    for nome_conta, link_conta in PERFIS_KWAI.items():
-        with cols_contas[idx_col % 3]:
-            with st.container(border=True):
-                st.markdown(f"**📺 @{nome_conta}**")
-                st.link_button("🔗 Abrir Canal no Kwai", link_conta, use_container_width=True)
-        idx_col += 1
+    with st.expander("📺 Ver Perfis Concorrentes do Kwai (Acesso Rápido)"):
+        st.caption("Acesse diretamente os perfis que você acompanha no Kwai:")
+        cols_kwai = st.columns(3)
+        for i, (nome_k, link_k) in enumerate(PERFIS_KWAI.items()):
+            with cols_kwai[i % 3]:
+                st.link_button(f"🔗 @{nome_k}", link_k, use_container_width=True)
 
-    st.markdown("<hr style='border-color: #30363d; margin: 30px 0;'>", unsafe_allow_html=True)
-
-    st.markdown("### 🔎 2. Radar de Cenas Virais por Tema")
+    # Barra de busca por temas
     col_pesq1, col_pesq2 = st.columns([3, 1])
     with col_pesq1:
-        termo_busca = st.text_input("Pesquise um tema específico:", value="ciúmes casal romance", placeholder="Ex: ciúmes, traição, vingança, beijo")
+        termo_feed = st.text_input("Tema do Feed:", value=st.session_state.get("termo_busca_salvo", "dorama ciúmes romance"), placeholder="Ex: ciúmes, vingança, beijo, comédia")
     with col_pesq2:
         st.write("")
         st.write("")
-        btn_rastrear = st.button("⚡ Rastrear Vídeos Virais", use_container_width=True, type="primary")
+        if st.button("🔄 Atualizar Feed", use_container_width=True):
+            st.session_state["termo_busca_salvo"] = termo_feed
+            st.session_state["feed_index"] = 0
+            st.session_state["videos_feed"] = buscar_videos_feed_tiktok(termo_feed)
+            st.rerun()
 
-    if btn_rastrear or "lista_radar" not in st.session_state:
-        with st.spinner("A varrer o nicho de doramas à procura das cenas mais visualizadas..."):
-            st.session_state["lista_radar"] = buscar_videos_radar(termo_busca)
+    if "videos_feed" not in st.session_state:
+        st.session_state["videos_feed"] = buscar_videos_feed_tiktok(termo_feed)
 
-    videos_encontrados = st.session_state.get("lista_radar", [])
-    if videos_encontrados:
-        st.markdown(f"#### 🎯 Vídeos recomendados para o tema: *{termo_busca}*")
-        cols_vitrine = st.columns(4)
-        for i, vid in enumerate(videos_encontrados):
-            with cols_vitrine[i % 4]:
-                with st.container(border=True):
-                    if vid.get("thumb"):
-                        st.image(vid["thumb"], use_container_width=True)
-                    st.caption(f"**{vid['title'][:55]}...**" if len(vid['title']) > 55 else f"**{vid['title']}**")
-                    if st.button("⚡ Usar este Vídeo no Corte", key=f"btn_vid_{i}", use_container_width=True):
-                        with st.spinner("A importar vídeo para a mesa de edição..."):
-                            sucesso, c_out, leg = descarregar_video_motor(vid["url"], pasta_temp)
-                            if sucesso and tem_imagem_de_video(c_out):
-                                st.session_state["video_original"] = c_out
-                                st.session_state["texto_input_armazenado"] = leg or vid["title"]
-                                st.session_state["preview_fixo"] = True
-                                st.session_state["url_manual_importada"] = vid["url"]
-                                st.success("✅ Vídeo importado com sucesso! Clique na aba '🎬 Editor de Cortes' no topo para editar.")
-                            else:
-                                st.error("Não foi possível carregar este vídeo automaticamente.")
+    lista_videos = st.session_state["videos_feed"]
+    total_videos = len(lista_videos)
+    idx_atual = max(0, min(st.session_state["feed_index"], total_videos - 1))
+    video_atual = lista_videos[idx_atual]
+
+    # Indicador de posição do feed
+    st.markdown(
+        f"<p style='text-align: center; color: #ff7676; font-size: 1.1rem; font-weight: 700; margin-bottom: 5px;'>"
+        f"📱 Vídeo {idx_atual + 1} de {total_videos}: <span style='color: white;'>{video_atual['title']}</span>"
+        f"</p>", 
+        unsafe_allow_html=True
+    )
+
+    # PLAYER VERTICAL FORMATO SMARTPHONE (TIKTOK / REELS)
+    col_esp1, col_player, col_esp2 = st.columns([1, 1.2, 1])
+    with col_player:
+        iframe_html = f"""
+        <div style="display: flex; justify-content: center; align-items: center; margin: 10px 0;">
+            <div style="width: 350px; height: 600px; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 35px rgba(255, 75, 75, 0.3); border: 2.5px solid #ff4b4b; background: #000;">
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/{video_atual['id']}?autoplay=1&mute=0&controls=1&loop=1&playlist={video_atual['id']}&playsinline=1" 
+                    title="Player TikTok Dorama" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                    allowfullscreen 
+                    style="border: none;">
+                </iframe>
+            </div>
+        </div>
+        """
+        st.components.v1.html(iframe_html, height=620)
+
+    # BOTÕES DE NAVEGAÇÃO E AÇÃO
+    col_nav1, col_nav2, col_nav3 = st.columns([1, 1.8, 1])
+    
+    with col_nav1:
+        if st.button("⏮️ Anterior", use_container_width=True):
+            if st.session_state["feed_index"] > 0:
+                st.session_state["feed_index"] -= 1
+                st.rerun()
+
+    with col_nav2:
+        btn_cortar_feed = st.button("✂️ CORTAR ESTE VÍDEO AGORA", type="primary", use_container_width=True)
+        if btn_cortar_feed:
+            with st.spinner("A transferir vídeo e a configurar o editor..."):
+                sucesso, c_out, leg = descarregar_video_motor(video_atual["url"], pasta_temp)
+                if sucesso and os.path.exists(c_out) and tem_imagem_de_video(c_out):
+                    st.session_state["video_original"] = c_out
+                    st.session_state["texto_input_armazenado"] = leg or video_atual["title"]
+                    st.session_state["preview_fixo"] = True
+                    st.session_state["url_manual_importada"] = video_atual["url"]
+                    st.session_state["nav_radio"] = "🎬 Editor de Cortes"
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Este vídeo possui proteção de reprodução na nuvem. Pressione 'Próximo ⏭️' para escolher outro ou cole um link do Kwai diretamente no Editor!")
+
+    with col_nav3:
+        if st.button("Próximo ⏭️", use_container_width=True):
+            if st.session_state["feed_index"] < total_videos - 1:
+                st.session_state["feed_index"] += 1
+                st.rerun()
 
 # ==============================================================================
 # ABA 2: EDITOR DE CORTES
 # ==============================================================================
-with aba_editor:
+elif aba_selecionada == "🎬 Editor de Cortes":
     col_topo_1, col_topo_2 = st.columns([1, 1])
 
     with col_topo_1:
@@ -384,7 +465,7 @@ with aba_editor:
                             st.session_state["preview_fixo"] = True
                             st.rerun()
                         else:
-                            st.error("Não foi possível transferir o vídeo desta ligação.")
+                            st.error("Não foi possível transferir este vídeo. Verifique se o link está acessível.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -471,7 +552,7 @@ with aba_editor:
                         st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                     else:
                         with st.status("🎬 A renderizar o corte...", expanded=True) as status:
-                            st.write("📥 A preparar os ficheiros...")
+                            st.write("📥 A preparar os ficheiros base...")
                             l1, l2 = quebrar_duas_linhas(texto_final)
                             caminho_molde = os.path.join(pasta_temp, "molde.jpg")
                             caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
