@@ -168,7 +168,7 @@ with col_topo_2:
                         caminho_preview = os.path.join(pasta_temp, "preview.mp4")
                         legenda_detectada = ""
 
-                        # --- LÓGICA DO KWAI (Mais rápida) ---
+                        # --- LÓGICA DO KWAI ---
                         if "kwai.com" in link_video or "kwai-video.com" in link_video:
                             req = urllib.request.Request(link_video, headers={'User-Agent': 'Mozilla/5.0'})
                             with urllib.request.urlopen(req, timeout=12) as resp:
@@ -190,16 +190,18 @@ with col_topo_2:
                             else:
                                 st.error("Não foi possível encontrar o ficheiro MP4 no link do Kwai.")
                         
-                        # --- LÓGICA TIKTOK E INSTAGRAM (Usando yt-dlp) ---
+                        # --- LÓGICA TIKTOK E INSTAGRAM (Com filtro vcodec!=none) ---
                         else:
                             try:
                                 import yt_dlp
                             except ImportError:
-                                st.error("⚠️ A biblioteca yt-dlp não está instalada. Certifique-se de que atualizou o ficheiro requirements.txt no GitHub.")
+                                st.error("⚠️ A biblioteca yt-dlp não está instalada. Verifique o requirements.txt.")
                                 st.stop()
 
                             ydl_opts = {
-                                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                                # Garante que obrigatoriamente existe imagem (vcodec!=none)
+                                'format': 'bestvideo[vcodec!=none]+bestaudio/best[vcodec!=none]/best',
+                                'merge_output_format': 'mp4',
                                 'outtmpl': os.path.join(pasta_temp, 'preview_dl.%(ext)s'),
                                 'quiet': True,
                                 'noplaylist': True,
@@ -212,12 +214,19 @@ with col_topo_2:
                                 texto_bruto = f"{titulo} {desc}"
                                 legenda_detectada = limpar_legenda(texto_bruto)
                             
-                            # Procura o ficheiro transferido pelo yt-dlp e renomeia
+                            # Procura o ficheiro transferido (mp4, mkv ou webm) e converte/renomeia para mp4
                             arquivos = glob.glob(os.path.join(pasta_temp, "preview_dl.*"))
                             if arquivos:
+                                arq_orig = arquivos[0]
                                 if os.path.exists(caminho_preview):
                                     os.remove(caminho_preview)
-                                shutil.move(arquivos[0], caminho_preview)
+                                
+                                # Se não terminou em .mp4 direto, remuxa com ffmpeg para garantir compatibilidade
+                                if not arq_orig.endswith(".mp4"):
+                                    subprocess.run(["ffmpeg", "-y", "-i", arq_orig, "-c", "copy", caminho_preview], check=True)
+                                    os.remove(arq_orig)
+                                else:
+                                    shutil.move(arq_orig, caminho_preview)
                                 
                                 st.session_state["video_original"] = caminho_preview
                                 st.session_state["legenda_detectada"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
@@ -226,7 +235,7 @@ with col_topo_2:
                                 st.error("Não foi possível transferir o vídeo desta plataforma.")
                                 
                     except Exception as e:
-                        st.error(f"⚠️ Erro ao aceder ao vídeo. Verifique se é uma conta pública/aberta. Detalhes: {e}")
+                        st.error(f"⚠️ Erro ao aceder ao vídeo. Detalhes: {e}")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
