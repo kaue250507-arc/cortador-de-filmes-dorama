@@ -6,7 +6,111 @@ import urllib.request
 import subprocess
 import streamlit as st
 
-st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide")
+# Configuração da página para ocupar todo o ecrã e com título atualizado
+st.set_page_config(page_title="Studio DoramaX", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+
+# ==========================================
+# INJEÇÃO DE CSS PREMIUM (DESIGN DA APP)
+# ==========================================
+st.markdown("""
+<style>
+    /* Esconder elementos padrão do Streamlit (menu, header e rodapé) */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Cor de fundo principal da aplicação */
+    .stApp {
+        background-color: #0b0f19;
+    }
+
+    /* Estilização do Título Principal */
+    .titulo-app {
+        text-align: center;
+        font-size: 3rem;
+        font-weight: 900;
+        background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
+        padding-top: 20px;
+    }
+    
+    .subtitulo-app {
+        text-align: center;
+        color: #8b949e;
+        font-size: 1.1rem;
+        margin-bottom: 40px;
+    }
+
+    /* Estilizar os "Containers" (as caixas com bordas) para parecerem cartões de app */
+    div[data-testid="stContainer"] {
+        background-color: #161b22;
+        border-radius: 16px !important;
+        border: 1px solid #30363d !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
+        padding: 15px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    div[data-testid="stContainer"]:hover {
+        border-color: #ff4b4b !important;
+        box-shadow: 0 8px 24px rgba(255, 75, 75, 0.1) !important;
+    }
+
+    /* Estilizar os Textos e Labels */
+    h3, h4 {
+        color: #e6edf3 !important;
+        font-weight: 700 !important;
+    }
+    label {
+        color: #c9d1d9 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Botões Padrão (Upload, Analisar, Pré-visualizar) */
+    div[data-testid="stButton"] button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: 1px solid #30363d;
+    }
+    div[data-testid="stButton"] button:hover {
+        border-color: #ff4b4b;
+        color: #ff4b4b;
+    }
+
+    /* Botão Principal (Renderização) com Efeito Premium */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #ff4b4b 0%, #ff1f1f 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 15px 0 !important;
+        font-size: 1.1rem !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4) !important;
+    }
+    button[kind="primary"]:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(255, 75, 75, 0.6) !important;
+    }
+
+    /* Campos de Input (Texto e Slider) */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
+        background-color: #0d1117 !important;
+        color: white !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+    }
+    .stTextInput input:focus, .stSelectbox div[data-baseweb="select"]:focus-within {
+        border-color: #ff4b4b !important;
+        box-shadow: 0 0 0 1px #ff4b4b !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+# ==========================================
 
 def limpar_legenda_kwai(texto):
     if not texto:
@@ -50,7 +154,9 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-st.markdown("<h1 style='text-align: center; padding-bottom: 20px;'>🎬 Gerador Filmes/Dorama</h1>", unsafe_allow_html=True)
+# Título Premium
+st.markdown('<div class="titulo-app">🎬 Studio DoramaX</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitulo-app">A sua ferramenta profissional de edição e cortes automáticos</div>', unsafe_allow_html=True)
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
@@ -97,21 +203,20 @@ with col_topo_2:
                     except Exception as e:
                         st.error(f"Erro na ligação ao Kwai: {e}")
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
-    st.markdown("## 🎛️ Painel de Edição e Renderização")
     
     col_preview, col_editor = st.columns([1, 1.2])
     
     with col_preview:
         with st.container(border=True):
-            st.markdown("#### 📺 Pré-visualização Original")
+            st.markdown("#### 📺 Visualizador de Mídia")
             st.video(st.session_state["video_original"])
 
     with col_editor:
         with st.container(border=True):
-            st.markdown("#### 📝 Ajustes do Corte")
+            st.markdown("#### 🎛️ Painel de Edição")
             texto_final = st.text_input(
                 "Texto de Destaque no Topo:", 
                 value=st.session_state.get("legenda_detectada", "")
@@ -120,7 +225,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             # SLIDER DE TAMANHO DA FONTE
             tamanho_fonte = st.slider("Tamanho da Fonte (reduza se o texto cortar no telemóvel):", min_value=30, max_value=90, value=65, step=5)
             
-            # BOTÃO DE PRÉ-VISUALIZAÇÃO DE IMAGEM (RÁPIDO)
+            # BOTÃO DE PRÉ-VISUALIZAÇÃO DE IMAGEM
             if st.button("👁️ Pré-visualizar Texto no Molde", use_container_width=True):
                 if not fundo_user or not fonte_user:
                     st.warning("⚠️ Envie o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
@@ -150,10 +255,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                             caminho_saida_prev
                         ]
                         subprocess.run(comando_prev, check=True)
-                        st.image(caminho_saida_prev, caption="Assim ficará o texto no vídeo final:", use_column_width=True)
+                        st.image(caminho_saida_prev, caption="Preview do Texto Final", use_column_width=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            duracao = st.selectbox("Duração do Corte:", ["30s", "50s", "60s", "Vídeo Completo"])
+            st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
+            
+            duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "Vídeo Completo"])
             st.markdown("<br>", unsafe_allow_html=True)
             
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
@@ -162,7 +268,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 if not fundo_user or not fonte_user:
                     st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                 else:
-                    with st.status("🎬 A renderizar o corte...", expanded=True) as status:
+                    with st.status("🎬 A renderizar o corte (Não saia desta página)...", expanded=True) as status:
                         st.write("📥 A preparar os ficheiros base...")
                         l1, l2 = quebrar_duas_linhas(texto_final)
                         
@@ -181,7 +287,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         with open(txt2_path, "w", encoding="utf-8") as f:
                             f.write(l2)
 
-                        st.write("📐 A calibrar enquadramento e aplicar a fonte...")
+                        st.write("📐 A calibrar enquadramento e aplicar tipografia...")
                         filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
                         espacamento = tamanho_fonte + 20
                         draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
@@ -206,11 +312,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                             comando.extend(["-t", mapa_dur[duracao]])
                         comando.append(caminho_saida)
 
-                        st.write("⚙️ A codificar o vídeo final...")
+                        st.write("⚙️ A codificar o vídeo final em alta resolução...")
                         subprocess.run(comando, check=True)
                         status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
 
                     with open(caminho_saida, "rb") as f_video:
                         st.balloons()
-                        st.success("O corte foi gerado com sucesso!")
+                        st.success("O seu conteúdo está pronto!")
                         st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_doramax_final.mp4", mime="video/mp4", use_container_width=True)
