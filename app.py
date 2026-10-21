@@ -2,19 +2,23 @@ import os
 import re
 import uuid
 import html
+import json
 import urllib.request
+import urllib.parse
 import subprocess
 import glob
 import shutil
 import streamlit as st
 
-# Configuração da aba do navegador
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
-# ==========================================
-# INJEÇÃO DE CSS PREMIUM (DESIGN DA APP)
-# ==========================================
+# Desativa tradução automática do navegador para evitar conflitos de DOM
 st.markdown("""
+<html lang="pt" translate="no">
+<head>
+    <meta name="google" content="notranslate" />
+</head>
+</html>
 <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
@@ -96,7 +100,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-# ==========================================
 
 def limpar_legenda(texto):
     if not texto:
@@ -135,8 +138,24 @@ def quebrar_duas_linhas(frase):
             menor_dif, melhor_corte = dif, i
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
+def tem_imagem_de_video(caminho_arquivo):
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        return "video" in res.stdout.lower()
+    except Exception:
+        return True
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
+
+if "texto_destaque" not in st.session_state:
+    st.session_state["texto_destaque"] = "ASSISTA ATÉ AO FIM"
+
+if "modo_preview_ativo" not in st.session_state:
+    st.session_state["modo_preview_ativo"] = True
 
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
@@ -166,9 +185,14 @@ with col_topo_2:
                 with st.spinner("A estabelecer ligação com a plataforma e a transferir o vídeo..."):
                     try:
                         caminho_preview = os.path.join(pasta_temp, "preview.mp4")
-                        legenda_detectada = ""
+                        for f_antigo in glob.glob(os.path.join(pasta_temp, "preview*")):
+                            try: os.remove(f_antigo)
+                            except Exception: pass
 
-                        # --- LÓGICA DO KWAI ---
+                        legenda_detectada = ""
+                        sucesso_download = False
+
+                        # Kwai
                         if "kwai.com" in link_video or "kwai-video.com" in link_video:
                             req = urllib.request.Request(link_video, headers={'User-Agent': 'Mozilla/5.0'})
                             with urllib.request.urlopen(req, timeout=12) as resp:
@@ -184,58 +208,70 @@ with col_topo_2:
                             urls_mp4 = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
                             if urls_mp4:
                                 urllib.request.urlretrieve(urls_mp4[0], caminho_preview)
-                                st.session_state["video_original"] = caminho_preview
-                                st.session_state["legenda_detectada"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
-                                st.rerun()
-                            else:
-                                st.error("Não foi possível encontrar o ficheiro MP4 no link do Kwai.")
-                        
-                        # --- LÓGICA TIKTOK E INSTAGRAM (Com filtro vcodec!=none) ---
-                        else:
-                            try:
-                                import yt_dlp
-                            except ImportError:
-                                st.error("⚠️ A biblioteca yt-dlp não está instalada. Verifique o requirements.txt.")
-                                st.stop()
+                                sucesso_download = True
 
+                        # TikTok
+                        elif "tiktok.com" in link_video:
+                            try:
+                                api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(link_video)}"
+                                req_tik = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+                                with urllib.request.urlopen(req_tik, timeout=15) as resp_tik:
+                                    dados_tik = json.loads(resp_tik.read().decode('utf-8'))
+                                    
+                                if dados_tik.get("code") == 0:
+                                    data_item = dados_tik.get("data", {})
+                                    if data_item.get("images"):
+                                        st.error("⚠️ Este link do TikTok é um carrossel de fotos (slideshow), não um vídeo.")
+                                        st.stop()
+                                    
+                                    url_mp4_tik = data_item.get("play") or data_item.get("wmplay")
+                                    if url_mp4_tik:
+                                        req_v = urllib.request.Request(url_mp4_tik, headers={'User-Agent': 'Mozilla/5.0'})
+                                        with urllib.request.urlopen(req_v, timeout=25) as v_stream, open(caminho_preview, "wb") as f_out:
+                                            f_out.write(v_stream.read())
+                                        legenda_detectada = limpar_legenda(data_item.get("title", ""))
+                                        sucesso_download = True
+                            except Exception:
+                                sucesso_download = False
+
+                        # Instagram / YouTube Shorts / Outros
+                        if not sucesso_download:
+                            import yt_dlp
                             ydl_opts = {
-                                # Garante que obrigatoriamente existe imagem (vcodec!=none)
-                                'format': 'bestvideo[vcodec!=none]+bestaudio/best[vcodec!=none]/best',
+                                'format': 'bv*[height>0]+ba/b[height>0]/best[height>0]',
                                 'merge_output_format': 'mp4',
                                 'outtmpl': os.path.join(pasta_temp, 'preview_dl.%(ext)s'),
                                 'quiet': True,
                                 'noplaylist': True,
                             }
-                            
                             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                                 info = ydl.extract_info(link_video, download=True)
-                                titulo = info.get('title', '')
-                                desc = info.get('description', '')
-                                texto_bruto = f"{titulo} {desc}"
-                                legenda_detectada = limpar_legenda(texto_bruto)
+                                if not legenda_detectada:
+                                    legenda_detectada = limpar_legenda(f"{info.get('title', '')} {info.get('description', '')}")
                             
-                            # Procura o ficheiro transferido (mp4, mkv ou webm) e converte/renomeia para mp4
                             arquivos = glob.glob(os.path.join(pasta_temp, "preview_dl.*"))
                             if arquivos:
                                 arq_orig = arquivos[0]
-                                if os.path.exists(caminho_preview):
-                                    os.remove(caminho_preview)
-                                
-                                # Se não terminou em .mp4 direto, remuxa com ffmpeg para garantir compatibilidade
                                 if not arq_orig.endswith(".mp4"):
                                     subprocess.run(["ffmpeg", "-y", "-i", arq_orig, "-c", "copy", caminho_preview], check=True)
-                                    os.remove(arq_orig)
+                                    try: os.remove(arq_orig)
+                                    except Exception: pass
                                 else:
                                     shutil.move(arq_orig, caminho_preview)
-                                
-                                st.session_state["video_original"] = caminho_preview
-                                st.session_state["legenda_detectada"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
-                                st.rerun()
+                                sucesso_download = True
+
+                        if sucesso_download and os.path.exists(caminho_preview):
+                            if not tem_imagem_de_video(caminho_preview):
+                                st.error("⚠️ O link fornecido descarregou apenas o áudio. Verifique se não se trata de uma galeria de fotos.")
                             else:
-                                st.error("Não foi possível transferir o vídeo desta plataforma.")
-                                
+                                st.session_state["video_original"] = caminho_preview
+                                st.session_state["texto_destaque"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
+                                st.session_state["modo_preview_ativo"] = True
+                                st.rerun()
+                        else:
+                            st.error("Não foi possível transferir o vídeo desta ligação.")
                     except Exception as e:
-                        st.error(f"⚠️ Erro ao aceder ao vídeo. Detalhes: {e}")
+                        st.error(f"⚠️ Erro ao processar o vídeo: {e}")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -251,43 +287,54 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
     with col_editor:
         with st.container(border=True):
             st.markdown("#### 🎛️ Painel de Edição")
+            
+            # Campo de texto vinculado à chave persistente (não reseta ao mover o slider)
             texto_final = st.text_input(
                 "Texto de Destaque no Topo:", 
-                value=st.session_state.get("legenda_detectada", "")
+                key="texto_destaque"
             )
             
-            tamanho_fonte = st.slider("Tamanho da Fonte (ajuste se cortar no ecrã):", min_value=30, max_value=90, value=65, step=5)
+            tamanho_fonte = st.slider("Tamanho da Fonte:", min_value=30, max_value=90, value=65, step=2, key="tamanho_fonte_slider")
             
-            if st.button("👁️ Pré-visualizar Texto no Molde", use_container_width=True):
+            # Controles de exibição da imagem de pré-visualização
+            col_b_prev1, col_b_prev2 = st.columns([1.5, 1])
+            with col_b_prev1:
+                if st.button("👁️ Atualizar / Abrir Imagem", use_container_width=True):
+                    st.session_state["modo_preview_ativo"] = True
+            with col_b_prev2:
+                if st.button("❌ Ocultar Imagem", use_container_width=True):
+                    st.session_state["modo_preview_ativo"] = False
+
+            # Pré-visualização automática e contínua com o texto editado pelo usuário
+            if st.session_state.get("modo_preview_ativo", True):
                 if not fundo_user or not fonte_user:
-                    st.warning("⚠️ Envie o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
+                    st.info("ℹ️ Carregue o Molde e a Fonte no Passo 1 para visualizar o alinhamento da imagem.")
                 else:
-                    with st.spinner("A gerar imagem de teste..."):
-                        l1, l2 = quebrar_duas_linhas(texto_final)
-                        caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
-                        caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
-                        caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
-                        txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
-                        txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
+                    l1, l2 = quebrar_duas_linhas(texto_final)
+                    caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
+                    caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
+                    caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
+                    txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
+                    txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
 
-                        with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
-                        with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
-                        with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
-                        with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
+                    with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
+                    with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
+                    with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
+                    with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
 
-                        espacamento = tamanho_fonte + 20
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
+                    espacamento = tamanho_fonte + 20
+                    draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
+                    draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
 
-                        filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
-                        comando_prev = [
-                            "ffmpeg", "-y", "-i", caminho_molde_prev,
-                            "-filter_complex", filtro_prev,
-                            "-map", "[v]", "-frames:v", "1", "-update", "1",
-                            caminho_saida_prev
-                        ]
-                        subprocess.run(comando_prev, check=True)
-                        st.image(caminho_saida_prev, caption="Preview do Texto Final", use_column_width=True)
+                    filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
+                    comando_prev = [
+                        "ffmpeg", "-y", "-i", caminho_molde_prev,
+                        "-filter_complex", filtro_prev,
+                        "-map", "[v]", "-frames:v", "1", "-update", "1",
+                        caminho_saida_prev
+                    ]
+                    subprocess.run(comando_prev, check=True)
+                    st.image(caminho_saida_prev, caption=f"Tamanho atual: {tamanho_fonte}px | Texto: {texto_final}", use_container_width=True)
 
             st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
             
@@ -349,6 +396,13 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
 
                     with open(caminho_saida, "rb") as f_video:
-                        st.balloons()
+                        conteudo_video = f_video.read()
                         st.success("O seu vídeo está pronto!")
-                        st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_final.mp4", mime="video/mp4", use_container_width=True)
+                        st.download_button(
+                            label="⬇️ BAIXAR VÍDEO PRONTO", 
+                            data=conteudo_video, 
+                            file_name="corte_final.mp4", 
+                            mime="video/mp4", 
+                            use_container_width=True,
+                            key="btn_download_video_final"
+                        )
