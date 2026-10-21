@@ -12,7 +12,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
-# Desativa tradução automática do navegador para evitar conflitos de DOM
+# Desativa tradução automática e remove o apagão/fade cinza ao mexer no slider
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -25,6 +25,19 @@ st.markdown("""
     footer {visibility: hidden;}
 
     .stApp { background-color: #0b0f19; }
+
+    /* Remove o apagão / desbotamento cinza durante o recarregamento do slider */
+    .stApp [data-testid="stImage"],
+    .stApp [data-testid="stContainer"],
+    div[data-testid="stVerticalBlock"] {
+        opacity: 1 !important;
+        filter: none !important;
+        transition: none !important;
+    }
+    div[data-testid="stImage"] img {
+        opacity: 1 !important;
+        transition: none !important;
+    }
 
     .titulo-app {
         text-align: center;
@@ -151,11 +164,9 @@ def tem_imagem_de_video(caminho_arquivo):
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
-if "texto_destaque" not in st.session_state:
-    st.session_state["texto_destaque"] = "ASSISTA ATÉ AO FIM"
-
-if "modo_preview_ativo" not in st.session_state:
-    st.session_state["modo_preview_ativo"] = True
+# Controla a fixação permanente da pré-visualização na tela
+if "preview_fixo" not in st.session_state:
+    st.session_state["preview_fixo"] = False
 
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
@@ -221,7 +232,7 @@ with col_topo_2:
                                 if dados_tik.get("code") == 0:
                                     data_item = dados_tik.get("data", {})
                                     if data_item.get("images"):
-                                        st.error("⚠️ Este link do TikTok é um carrossel de fotos (slideshow), não um vídeo.")
+                                        st.error("⚠️ Este link do TikTok é um carrossel de fotos, não um vídeo.")
                                         st.stop()
                                     
                                     url_mp4_tik = data_item.get("play") or data_item.get("wmplay")
@@ -262,11 +273,11 @@ with col_topo_2:
 
                         if sucesso_download and os.path.exists(caminho_preview):
                             if not tem_imagem_de_video(caminho_preview):
-                                st.error("⚠️ O link fornecido descarregou apenas o áudio. Verifique se não se trata de uma galeria de fotos.")
+                                st.error("⚠️ O link fornecido descarregou apenas áudio.")
                             else:
                                 st.session_state["video_original"] = caminho_preview
-                                st.session_state["texto_destaque"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
-                                st.session_state["modo_preview_ativo"] = True
+                                st.session_state["texto_input_armazenado"] = legenda_detectada or "ASSISTA ATÉ AO FIM"
+                                st.session_state["preview_fixo"] = True
                                 st.rerun()
                         else:
                             st.error("Não foi possível transferir o vídeo desta ligação.")
@@ -288,27 +299,36 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
         with st.container(border=True):
             st.markdown("#### 🎛️ Painel de Edição")
             
-            # Campo de texto vinculado à chave persistente (não reseta ao mover o slider)
-            texto_final = st.text_input(
-                "Texto de Destaque no Topo:", 
-                key="texto_destaque"
+            valor_inicial = st.session_state.get("texto_input_armazenado", "ASSISTA ATÉ AO FIM")
+            texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial, key="campo_texto_destaque")
+            st.session_state["texto_input_armazenado"] = texto_final
+            
+            # Slider de ajuste de tamanho de fonte
+            tamanho_fonte = st.slider(
+                "Tamanho da Fonte:", 
+                min_value=30, 
+                max_value=90, 
+                value=st.session_state.get("valor_tamanho_fonte", 65), 
+                step=2,
+                key="slider_tamanho_fonte"
             )
+            st.session_state["valor_tamanho_fonte"] = tamanho_fonte
             
-            tamanho_fonte = st.slider("Tamanho da Fonte:", min_value=30, max_value=90, value=65, step=2, key="tamanho_fonte_slider")
-            
-            # Controles de exibição da imagem de pré-visualização
-            col_b_prev1, col_b_prev2 = st.columns([1.5, 1])
-            with col_b_prev1:
-                if st.button("👁️ Atualizar / Abrir Imagem", use_container_width=True):
-                    st.session_state["modo_preview_ativo"] = True
-            with col_b_prev2:
+            # Botões para abrir e travar a pré-visualização ou ocultá-la
+            col_b1, col_b2 = st.columns([1.5, 1])
+            with col_b1:
+                if st.button("👁️ Abrir / Fixar Imagem", use_container_width=True):
+                    st.session_state["preview_fixo"] = True
+                    st.rerun()
+            with col_b2:
                 if st.button("❌ Ocultar Imagem", use_container_width=True):
-                    st.session_state["modo_preview_ativo"] = False
+                    st.session_state["preview_fixo"] = False
+                    st.rerun()
 
-            # Pré-visualização automática e contínua com o texto editado pelo usuário
-            if st.session_state.get("modo_preview_ativo", True):
+            # Bloco que mantém a imagem aberta enquanto você mexe no slider
+            if st.session_state.get("preview_fixo", False):
                 if not fundo_user or not fonte_user:
-                    st.info("ℹ️ Carregue o Molde e a Fonte no Passo 1 para visualizar o alinhamento da imagem.")
+                    st.info("ℹ️ Carregue o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
                 else:
                     l1, l2 = quebrar_duas_linhas(texto_final)
                     caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
@@ -334,7 +354,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         caminho_saida_prev
                     ]
                     subprocess.run(comando_prev, check=True)
-                    st.image(caminho_saida_prev, caption=f"Tamanho atual: {tamanho_fonte}px | Texto: {texto_final}", use_container_width=True)
+                    st.image(caminho_saida_prev, caption=f"Tamanho da fonte: {tamanho_fonte}px", use_container_width=True)
 
             st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
             
