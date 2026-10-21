@@ -12,7 +12,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
-# Desativa tradução automática e remove o apagão/fade cinza ao mexer no slider
+# Desativa tradução automática e personaliza o estilo
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
@@ -26,7 +26,6 @@ st.markdown("""
 
     .stApp { background-color: #0b0f19; }
 
-    /* Remove o apagão / desbotamento cinza durante o recarregamento do slider */
     .stApp [data-testid="stImage"],
     .stApp [data-testid="stContainer"],
     div[data-testid="stVerticalBlock"] {
@@ -161,10 +160,26 @@ def tem_imagem_de_video(caminho_arquivo):
     except Exception:
         return True
 
+def tem_audio(caminho_arquivo):
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        return "audio" in res.stdout.lower()
+    except Exception:
+        return True
+
+PERFIS_MOLDES = {
+    "DoramaX (Principal)": "molde_doramax.jpg",
+    "Canal Sócio 1": "molde_socio1.jpg",
+    "Canal Sócio 2": "molde_socio2.jpg",
+    "Outro / Upload Manual": None
+}
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
-# Controla a fixação permanente da pré-visualização na tela
 if "preview_fixo" not in st.session_state:
     st.session_state["preview_fixo"] = False
 
@@ -172,18 +187,45 @@ pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
 st.markdown('<div class="titulo-app">🎬 Gerador Filmes/Dorama</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo-app">Cortes automáticos para vídeos do Kwai, TikTok e Instagram</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitulo-app">Cortes automáticos com Sistema Anti-Copyright para Redes Sociais</div>', unsafe_allow_html=True)
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
 with col_topo_1:
     with st.container(border=True):
-        st.markdown("### 📁 1. Arquivos de Identidade Visual")
-        col_molde, col_fonte = st.columns(2)
-        with col_molde:
-            fundo_user = st.file_uploader("Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
-        with col_fonte:
-            fonte_user = st.file_uploader("Fonte (TTF)", type=["ttf"])
+        st.markdown("### 📁 1. Perfil e Identidade Visual")
+        
+        perfil_escolhido = st.selectbox(
+            "Selecione o seu Canal / Conta:",
+            list(PERFIS_MOLDES.keys())
+        )
+        
+        bytes_molde = None
+        bytes_fonte = None
+        
+        arquivo_perfil = PERFIS_MOLDES[perfil_escolhido]
+        
+        if arquivo_perfil and os.path.exists(arquivo_perfil):
+            with open(arquivo_perfil, "rb") as f:
+                bytes_molde = f.read()
+            st.caption(f"🟢 **Molde ativo:** {perfil_escolhido}")
+        else:
+            if perfil_escolhido != "Outro / Upload Manual":
+                st.caption(f"⚠️ Arquivo `{arquivo_perfil}` não encontrado. Faça o envio abaixo:")
+            fundo_user = st.file_uploader("Enviar Imagem do Molde (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            if fundo_user:
+                bytes_molde = fundo_user.getvalue()
+
+        for fonte_padrao in ["fonte_padrao.ttf", "Nexa-Heavy.ttf"]:
+            if os.path.exists(fonte_padrao):
+                with open(fonte_padrao, "rb") as f:
+                    bytes_fonte = f.read()
+                break
+
+        if not bytes_fonte:
+            fonte_user = st.file_uploader("Enviar Arquivo da Fonte (TTF)", type=["ttf", "otf"])
+            if fonte_user:
+                bytes_fonte = fonte_user.getvalue()
 
 with col_topo_2:
     with st.container(border=True):
@@ -297,24 +339,45 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
     with col_editor:
         with st.container(border=True):
-            st.markdown("#### 🎛️ Painel de Edição")
+            st.markdown("#### 🎛️ Painel de Personalização")
             
             valor_inicial = st.session_state.get("texto_input_armazenado", "ASSISTA ATÉ AO FIM")
             texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial, key="campo_texto_destaque")
             st.session_state["texto_input_armazenado"] = texto_final
             
-            # Slider de ajuste de tamanho de fonte
-            tamanho_fonte = st.slider(
-                "Tamanho da Fonte:", 
-                min_value=30, 
-                max_value=90, 
-                value=st.session_state.get("valor_tamanho_fonte", 65), 
-                step=2,
-                key="slider_tamanho_fonte"
-            )
-            st.session_state["valor_tamanho_fonte"] = tamanho_fonte
-            
-            # Botões para abrir e travar a pré-visualização ou ocultá-la
+            # --- AJUSTES DE TAMANHO E ALTURA (POSIÇÃO Y) ---
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                tamanho_fonte = st.slider(
+                    "Tamanho da Fonte:", 
+                    min_value=30, max_value=90, 
+                    value=st.session_state.get("valor_tamanho_fonte", 65), 
+                    step=2, key="slider_tamanho_fonte"
+                )
+                st.session_state["valor_tamanho_fonte"] = tamanho_fonte
+            with col_t2:
+                posicao_y = st.slider(
+                    "Altura do Texto (Posição Vertical):", 
+                    min_value=300, max_value=700, 
+                    value=st.session_state.get("valor_posicao_y", 500), 
+                    step=10, key="slider_posicao_y"
+                )
+                st.session_state["valor_posicao_y"] = posicao_y
+
+            # --- AJUSTES DE COR E CONTORNO (BORDA) ---
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                opcoes_cor = {"Preto": "black", "Branco": "white", "Amarelo": "yellow"}
+                cor_nome = st.selectbox("Cor do Texto:", list(opcoes_cor.keys()), index=0)
+                cor_hex = opcoes_cor[cor_nome]
+            with col_c2:
+                opcoes_borda = {"Sem Borda": 0, "Borda Fina": 3, "Borda Marcante": 5}
+                borda_nome = st.selectbox("Contorno / Borda:", list(opcoes_borda.keys()), index=0)
+                largura_borda = opcoes_borda[borda_nome]
+                # Borda contrastante automática
+                cor_borda = "white" if cor_hex == "black" else "black"
+
+            # --- CONTROLES DE PRÉ-VISUALIZAÇÃO ---
             col_b1, col_b2 = st.columns([1.5, 1])
             with col_b1:
                 if st.button("👁️ Abrir / Fixar Imagem", use_container_width=True):
@@ -325,10 +388,10 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     st.session_state["preview_fixo"] = False
                     st.rerun()
 
-            # Bloco que mantém a imagem aberta enquanto você mexe no slider
+            # RENDERIZAÇÃO DA PRÉ-VISUALIZAÇÃO COM TODAS AS CORES E POSIÇÕES
             if st.session_state.get("preview_fixo", False):
-                if not fundo_user or not fonte_user:
-                    st.info("ℹ️ Carregue o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
+                if not bytes_molde or not bytes_fonte:
+                    st.info("ℹ️ Selecione um Perfil ou envie o molde no Passo 1 para exibir a imagem.")
                 else:
                     l1, l2 = quebrar_duas_linhas(texto_final)
                     caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
@@ -337,14 +400,22 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
                     txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
 
-                    with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
-                    with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
+                    with open(caminho_molde_prev, "wb") as f: f.write(bytes_molde)
+                    with open(caminho_fonte_prev, "wb") as f: f.write(bytes_fonte)
                     with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
                     with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
 
                     espacamento = tamanho_fonte + 20
-                    draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
-                    draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
+                    draw_l1 = (
+                        f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':"
+                        f"fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:"
+                        f"x=(w-text_w)/2:y={posicao_y}"
+                    )
+                    draw_l2 = (
+                        f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':"
+                        f"fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:"
+                        f"x=(w-text_w)/2:y={posicao_y}+{espacamento}"
+                    )
 
                     filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
                     comando_prev = [
@@ -354,9 +425,16 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         caminho_saida_prev
                     ]
                     subprocess.run(comando_prev, check=True)
-                    st.image(caminho_saida_prev, caption=f"Tamanho da fonte: {tamanho_fonte}px", use_container_width=True)
+                    st.image(caminho_saida_prev, caption=f"Altura: {posicao_y}px | Fonte: {tamanho_fonte}px | Cor: {cor_nome}", use_container_width=True)
 
             st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
+            
+            # --- PROTEÇÃO ANTI-COPYRIGHT ---
+            modo_anti_copyright = st.checkbox(
+                "🛡️ Ativar Modo Anti-Copyright / Anti-Strike", 
+                value=True,
+                help="Acelera sutilmente o vídeo em 1.03x e altera a assinatura de áudio para driblar o sistema Content ID do TikTok e Instagram."
+            )
             
             duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "Vídeo Completo"])
             st.markdown("<br>", unsafe_allow_html=True)
@@ -364,8 +442,8 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
             if btn_gerar:
-                if not fundo_user or not fonte_user:
-                    st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
+                if not bytes_molde or not bytes_fonte:
+                    st.error("⚠️ Nenhum molde configurado para este perfil.")
                 else:
                     with st.status("🎬 A renderizar o corte...", expanded=True) as status:
                         st.write("📥 A preparar os ficheiros base...")
@@ -378,23 +456,48 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         txt2_path = os.path.join(pasta_temp, "l2.txt")
 
                         with open(caminho_molde, "wb") as f:
-                            f.write(fundo_user.getbuffer())
+                            f.write(bytes_molde)
                         with open(caminho_fonte, "wb") as f:
-                            f.write(fonte_user.getbuffer())
+                            f.write(bytes_fonte)
                         with open(txt1_path, "w", encoding="utf-8") as f:
                             f.write(l1)
                         with open(txt2_path, "w", encoding="utf-8") as f:
                             f.write(l2)
 
-                        st.write("📐 A calibrar enquadramento e aplicar tipografia...")
-                        filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
+                        st.write("📐 A calibrar enquadramento, cores e tipografia...")
                         espacamento = tamanho_fonte + 20
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontcolor=black:fontsize={tamanho_fonte}:x=(w-text_w)/2:y=500+{espacamento}"
+                        draw_l1 = (
+                            f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':"
+                            f"fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:"
+                            f"x=(w-text_w)/2:y={posicao_y}"
+                        )
+                        draw_l2 = (
+                            f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':"
+                            f"fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:"
+                            f"x=(w-text_w)/2:y={posicao_y}+{espacamento}"
+                        )
+
+                        # Aplicação do algoritmo Anti-Strike
+                        if modo_anti_copyright:
+                            filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608,setpts=PTS/1.03[vid];"
+                        else:
+                            filtro_video = "[1:v]crop=in_w:in_w*9/16:0:(in_h-in_w*9/16)/2,scale=1080:608[vid];"
+
+                        tem_som = tem_audio(st.session_state["video_original"])
+                        if modo_anti_copyright and tem_som:
+                            filtro_audio = "[1:a]atempo=1.03[a];"
+                            mapa_audio = ["[a]"]
+                        elif tem_som:
+                            filtro_audio = ""
+                            mapa_audio = ["1:a?"]
+                        else:
+                            filtro_audio = ""
+                            mapa_audio = []
 
                         filtro_completo = (
                             f"[0:v]scale=1080:1920[fundo];"
                             f"{filtro_video}"
+                            f"{filtro_audio}"
                             f"[fundo][vid]overlay=0:(H-h)/2[base];"
                             f"[base]{draw_l1},{draw_l2}[v]"
                         )
@@ -402,9 +505,13 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         comando = [
                             "ffmpeg", "-y", "-i", caminho_molde, "-i", st.session_state["video_original"],
                             "-filter_complex", filtro_completo,
-                            "-map", "[v]", "-map", "1:a?",
-                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac"
+                            "-map", "[v]"
                         ]
+                        
+                        if mapa_audio:
+                            comando.extend(["-map", mapa_audio[0], "-c:a", "aac"])
+                            
+                        comando.extend(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"])
 
                         mapa_dur = {"30s": "30", "50s": "50", "60s": "60"}
                         if duracao in mapa_dur:
@@ -417,7 +524,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                     with open(caminho_saida, "rb") as f_video:
                         conteudo_video = f_video.read()
-                        st.success("O seu vídeo está pronto!")
+                        st.success("O seu vídeo protegido e formatado está pronto!")
                         st.download_button(
                             label="⬇️ BAIXAR VÍDEO PRONTO", 
                             data=conteudo_video, 
