@@ -6,44 +6,44 @@ import urllib.request
 import subprocess
 import streamlit as st
 
-# Configuração da página para ocupar todo o ecrã e com título atualizado
-st.set_page_config(page_title="Studio DoramaX", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+# Configuração da aba do navegador
+st.set_page_config(page_title="Gerador Filmes/Dorama", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
 # INJEÇÃO DE CSS PREMIUM (DESIGN DA APP)
 # ==========================================
 st.markdown("""
 <style>
-    /* Esconder elementos padrão do Streamlit (menu, header e rodapé) */
+    /* Esconder elementos padrão do Streamlit */
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Cor de fundo principal da aplicação */
+    /* Fundo escuro */
     .stApp {
         background-color: #0b0f19;
     }
 
-    /* Estilização do Título Principal */
+    /* Título com gradiente */
     .titulo-app {
         text-align: center;
-        font-size: 3rem;
+        font-size: 2.8rem;
         font-weight: 900;
         background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         padding-top: 20px;
     }
     
     .subtitulo-app {
         text-align: center;
         color: #8b949e;
-        font-size: 1.1rem;
-        margin-bottom: 40px;
+        font-size: 1.05rem;
+        margin-bottom: 35px;
     }
 
-    /* Estilizar os "Containers" (as caixas com bordas) para parecerem cartões de app */
+    /* Cartões / Containers */
     div[data-testid="stContainer"] {
         background-color: #161b22;
         border-radius: 16px !important;
@@ -58,7 +58,6 @@ st.markdown("""
         box-shadow: 0 8px 24px rgba(255, 75, 75, 0.1) !important;
     }
 
-    /* Estilizar os Textos e Labels */
     h3, h4 {
         color: #e6edf3 !important;
         font-weight: 700 !important;
@@ -68,7 +67,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* Botões Padrão (Upload, Analisar, Pré-visualizar) */
+    /* Botões Padrão */
     div[data-testid="stButton"] button {
         border-radius: 8px;
         font-weight: 600;
@@ -80,14 +79,14 @@ st.markdown("""
         color: #ff4b4b;
     }
 
-    /* Botão Principal (Renderização) com Efeito Premium */
+    /* Botão Principal com Destaque */
     button[kind="primary"] {
         background: linear-gradient(135deg, #ff4b4b 0%, #ff1f1f 100%) !important;
         color: white !important;
         border: none !important;
         border-radius: 10px !important;
         padding: 15px 0 !important;
-        font-size: 1.1rem !important;
+        font-size: 1.05rem !important;
         text-transform: uppercase;
         letter-spacing: 1px;
         box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4) !important;
@@ -97,7 +96,7 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(255, 75, 75, 0.6) !important;
     }
 
-    /* Campos de Input (Texto e Slider) */
+    /* Inputs e Caixas de Seleção */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #0d1117 !important;
         color: white !important;
@@ -128,6 +127,7 @@ def limpar_legenda_kwai(texto):
     texto = re.sub(r'@\S+', '', texto)
     texto = re.sub(r'https?://\S+', '', texto)
     texto = re.sub(r'(?i)doramas?\s*(brasil|br|oficial|coreano)?', '', texto)
+    texto = re.sub(r'(?i)filmes?\s*(brasil|br|oficial)?', '', texto)
     texto = re.sub(r'(?i)drosil', '', texto)
     texto = texto.replace('"', '').replace("'", "").replace("(", "").replace(")", "")
     return " ".join(texto.split()).strip()
@@ -154,9 +154,9 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-# Título Premium
-st.markdown('<div class="titulo-app">🎬 Studio DoramaX</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitulo-app">A sua ferramenta profissional de edição e cortes automáticos</div>', unsafe_allow_html=True)
+# Título ajustado para Filmes e Doramas
+st.markdown('<div class="titulo-app">🎬 Gerador Filmes/Dorama</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitulo-app">Cortes automáticos e edição padronizada para Filmes, Séries e Doramas</div>', unsafe_allow_html=True)
 
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
@@ -222,10 +222,8 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 value=st.session_state.get("legenda_detectada", "")
             )
             
-            # SLIDER DE TAMANHO DA FONTE
-            tamanho_fonte = st.slider("Tamanho da Fonte (reduza se o texto cortar no telemóvel):", min_value=30, max_value=90, value=65, step=5)
+            tamanho_fonte = st.slider("Tamanho da Fonte (ajuste se cortar no ecrã):", min_value=30, max_value=90, value=65, step=5)
             
-            # BOTÃO DE PRÉ-VISUALIZAÇÃO DE IMAGEM
             if st.button("👁️ Pré-visualizar Texto no Molde", use_container_width=True):
                 if not fundo_user or not fonte_user:
                     st.warning("⚠️ Envie o Molde e a Fonte no Passo 1 para ver a pré-visualização.")
@@ -268,7 +266,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 if not fundo_user or not fonte_user:
                     st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                 else:
-                    with st.status("🎬 A renderizar o corte (Não saia desta página)...", expanded=True) as status:
+                    with st.status("🎬 A renderizar o corte...", expanded=True) as status:
                         st.write("📥 A preparar os ficheiros base...")
                         l1, l2 = quebrar_duas_linhas(texto_final)
                         
@@ -318,5 +316,5 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
                     with open(caminho_saida, "rb") as f_video:
                         st.balloons()
-                        st.success("O seu conteúdo está pronto!")
-                        st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_doramax_final.mp4", mime="video/mp4", use_container_width=True)
+                        st.success("O seu vídeo está pronto!")
+                        st.download_button(label="⬇️ BAIXAR VÍDEO PRONTO", data=f_video.read(), file_name="corte_final.mp4", mime="video/mp4", use_container_width=True)
