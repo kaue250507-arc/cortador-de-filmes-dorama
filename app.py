@@ -87,7 +87,6 @@ def ler_feed_da_planilha(url_compartilhamento):
             leitor = csv.reader(linhas)
             dados = list(leitor)
 
-            # Percorre a partir da linha 2 (ignora os cabeçalhos)
             for linha in dados[1:]:
                 if len(linha) >= 5:
                     origem = linha[0].strip()
@@ -96,7 +95,6 @@ def ler_feed_da_planilha(url_compartilhamento):
                     url_orig = linha[3].strip()
                     url_mp4 = linha[4].strip()
 
-                    # Adiciona apenas as linhas que já têm o link MP4 pronto da CDN
                     if url_mp4 and url_mp4.startswith("http") and url_mp4 != "-":
                         videos.append({
                             "origem": origem or "Kwai",
@@ -108,7 +106,6 @@ def ler_feed_da_planilha(url_compartilhamento):
     except Exception as e:
         st.error(f"Erro ao carregar a folha de cálculo: {e}")
 
-    # Exibe os clipes mais recentes no topo
     return list(reversed(videos))
 
 def quebrar_duas_linhas(frase):
@@ -176,7 +173,7 @@ st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; mar
 col_nav_1, col_nav_2 = st.columns(2)
 with col_nav_1:
     tipo_feed = "primary" if st.session_state["aba_ativa"] == "feed" else "secondary"
-    if st.button("🔥 Feed de Vídeos (Planilha)", type=tipo_feed, use_container_width=True):
+    if st.button("🔥 Feed Vídeos", type=tipo_feed, use_container_width=True):
         st.session_state["aba_ativa"] = "feed"
         st.rerun()
 
@@ -212,7 +209,6 @@ if st.session_state["aba_ativa"] == "feed":
                 st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
                 st.caption(f"📍 Rede: **{item['origem']}** | 👤 Canal: **{item['canal']}**")
 
-                # O link .mp4 direto da CDN reproduz instantaneamente sem tela preta
                 st.video(item["mp4"])
 
                 if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_{idx}_{item['titulo'][:10]}", type="primary", use_container_width=True):
