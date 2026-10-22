@@ -1,0 +1,37 @@
+name: Atualizar Feed Automatico
+
+on:
+  schedule:
+    # Executa a cada 60 minutos (1 hora)
+    - cron: '0 * * * *'
+  # Permite que você rode na hora que quiser com um clique
+  workflow_dispatch:
+
+jobs:
+  minerar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o Repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Dependencias
+        run: |
+          pip install yt-dlp
+
+      - name: Executar Minerador
+        run: |
+          python minerar.py
+
+      - name: Gravar o feed_doramas.json no Repositorio
+        run: |
+          git config --global user.name "Robo Studio Dorama"
+          git config --global user.email "bot@studiodorama.com"
+          git add feed_doramas.json
+          git commit -m "Auto: Feed atualizado com novos videos [skip ci]" || exit 0
+          git push
