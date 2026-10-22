@@ -1,57 +1,21 @@
 import os
 import re
+import csv
 import uuid
 import html
-import json
 import random
 import urllib.request
 import urllib.parse
 import subprocess
 import glob
-import shutil
 import streamlit as st
 
 st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
-# CATÁLOGO DE VÍDEOS DE DORAMAS DAS CONTAS MONITORADAS
-VIDEOS_CATALOGO = [
-    {
-        "canal": "@doramasbrasil",
-        "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
-        "dorama": "Beleza Verdadeira (True Beauty)",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    },
-    {
-        "canal": "@Doramasonline",
-        "titulo": "Quando ele percebe que ela corre perigo e corre para proteger 🥺🔥",
-        "dorama": "Cena Dramática de Romance",
-        "url": "https://k.kwai.com/p/sm1cglmd"
-    },
-    {
-        "canal": "@josiiedits",
-        "titulo": "Ele não aguentou ver outro homem falar com ela na escola 😱✨",
-        "dorama": "Romance Escolar",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    },
-    {
-        "canal": "@clichegarota",
-        "titulo": "A declaração mais esperada do dorama depois de tanto orgulho 😭💍",
-        "dorama": "Pousando no Amor",
-        "url": "https://k.kwai.com/p/sm1cglmd"
-    },
-    {
-        "canal": "@DoramaOnline",
-        "titulo": "O reencontro emocionante após anos separados pelo destino 💔✨",
-        "dorama": "Vinte e Cinco, Vinte e Um",
-        "url": "https://k.kwai.com/p/sHCgDks5"
-    },
-    {
-        "canal": "@mundosdodorama552",
-        "titulo": "A reação dele quando viu ela arrumada para o baile da faculdade 😍👗",
-        "dorama": "Pretendente Surpresa",
-        "url": "https://k.kwai.com/p/sm1cglmd"
-    }
-]
+# ==============================================================================
+# CONFIGURAÇÃO DIRETA DA SUA PLANILHA GOOGLE
+# ==============================================================================
+LINK_PLANILHA_GOOGLE = "https://docs.google.com/spreadsheets/d/1erUG1HU4oTtdMI_KI3nEjb1imPbxgfoS2aSn3B45nt8/edit?usp=sharing"
 
 st.markdown("""
 <html lang="pt" translate="no">
@@ -101,72 +65,51 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=7200, show_spinner=False)
-def extrair_stream_mp4_real(url_alvo):
-    """Extrai o link limpo .mp4 da CDN oficial para nunca exibir tela preta."""
-    if not url_alvo:
-        return None
-    
-    # Se já é um link direto de arquivo mp4
-    if ".mp4" in url_alvo.split("?")[0] and "k.kwai.com" not in url_alvo and "kwai.com" not in url_alvo:
-        return url_alvo
+def converter_link_para_csv(link):
+    match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', link)
+    if match:
+        sheet_id = match.group(1)
+        return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
+    return link
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    }
+@st.cache_data(ttl=15, show_spinner=False)
+def ler_feed_da_planilha(url_compartilhamento):
+    if not url_compartilhamento:
+        return []
 
-    # Extração de Kwai
-    if any(k in url_alvo for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
-        try:
-            req = urllib.request.Request(url_alvo, headers=headers)
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                html_raw = resp.read().decode('utf-8', errors='ignore')
-            
-            # Captura a URL .mp4 da CDN da AWS/Kwai
-            matches = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
-            for m in matches:
-                if "kwai" in m or "cdn" in m:
-                    return m
-            if matches:
-                return matches[0]
-        except Exception:
-            pass
+    url_csv = converter_link_para_csv(url_compartilhamento)
+    videos = []
 
-    # Extração de TikTok
-    if "tiktok.com" in url_alvo:
-        try:
-            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_alvo)}"
-            req_t = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_t, timeout=10) as resp_t:
-                dados_t = json.loads(resp_t.read().decode('utf-8'))
-            if dados_t.get("code") == 0:
-                return dados_t.get("data", {}).get("play")
-        except Exception:
-            pass
+    try:
+        req = urllib.request.Request(url_csv, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            linhas = resp.read().decode('utf-8', errors='ignore').splitlines()
+            leitor = csv.reader(linhas)
+            dados = list(leitor)
 
-    return url_alvo
+            # Percorre a partir da linha 2 (ignora os cabeçalhos)
+            for linha in dados[1:]:
+                if len(linha) >= 5:
+                    origem = linha[0].strip()
+                    canal = linha[1].strip()
+                    titulo = linha[2].strip()
+                    url_orig = linha[3].strip()
+                    url_mp4 = linha[4].strip()
 
-def limpar_legenda(texto):
-    if not texto:
-        return ""
-    partes = texto.split(',')
-    if len(partes) >= 2:
-        candidato = partes[0].strip()
-        if len(candidato) > 10 and candidato in texto[len(candidato):]:
-            texto = candidato
-    if ":" in texto:
-        p2 = texto.split(":", 1)
-        if len(p2) > 1 and len(p2[1].strip()) > 5:
-            texto = p2[1]
-    texto = re.sub(r'#\S+', '', texto)
-    texto = re.sub(r'@\S+', '', texto)
-    texto = re.sub(r'https?://\S+', '', texto)
-    texto = re.sub(r'(?i)doramas?\s*(brasil|br|oficial|coreano)?', '', texto)
-    texto = re.sub(r'(?i)filmes?\s*(brasil|br|oficial)?', '', texto)
-    texto = re.sub(r'(?i)drosil', '', texto)
-    texto = texto.replace('"', '').replace("'", "").replace("(", "").replace(")", "")
-    return " ".join(texto.split()).strip()
+                    # Adiciona apenas as linhas que já têm o link MP4 pronto da CDN
+                    if url_mp4 and url_mp4.startswith("http") and url_mp4 != "-":
+                        videos.append({
+                            "origem": origem or "Kwai",
+                            "canal": canal or "@dorama",
+                            "titulo": titulo or "Cena Viral de Dorama",
+                            "url_original": url_orig,
+                            "mp4": url_mp4
+                        })
+    except Exception as e:
+        st.error(f"Erro ao carregar a folha de cálculo: {e}")
+
+    # Exibe os clipes mais recentes no topo
+    return list(reversed(videos))
 
 def quebrar_duas_linhas(frase):
     palavras = frase.split()
@@ -184,16 +127,6 @@ def quebrar_duas_linhas(frase):
             menor_dif, melhor_corte = dif, i
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
-def tem_imagem_de_video(caminho_arquivo):
-    try:
-        res = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        return "video" in res.stdout.lower()
-    except Exception:
-        return True
-
 def tem_audio(caminho_arquivo):
     try:
         res = subprocess.run(
@@ -204,57 +137,46 @@ def tem_audio(caminho_arquivo):
     except Exception:
         return True
 
-def descarregar_video_motor(url_alvo, pasta_destino):
-    """Baixa o vídeo para a bancada de corte."""
+def baixar_video_direto(url_alvo, pasta_destino):
     caminho_saida = os.path.join(pasta_destino, "preview.mp4")
-    for f_antigo in glob.glob(os.path.join(pasta_destino, "preview*")):
-        try: os.remove(f_antigo)
+    for f in glob.glob(os.path.join(pasta_destino, "preview*")):
+        try: os.remove(f)
         except Exception: pass
-
-    link_mp4 = extrair_stream_mp4_real(url_alvo)
-    alvo = link_mp4 if link_mp4 else url_alvo
 
     sucesso = False
     try:
-        req = urllib.request.Request(alvo, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=30) as v_stream, open(caminho_saida, "wb") as f_out:
+        req = urllib.request.Request(url_alvo, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=35) as v_stream, open(caminho_saida, "wb") as f_out:
             f_out.write(v_stream.read())
         sucesso = True
     except Exception:
         try:
-            urllib.request.urlretrieve(alvo, caminho_saida)
+            urllib.request.urlretrieve(url_alvo, caminho_saida)
             sucesso = True
         except Exception:
             sucesso = False
 
     return sucesso, caminho_saida
 
-# ==========================================
-# INICIALIZAÇÃO DE SESSÃO
-# ==========================================
+# ==============================================================================
+# SESSÃO E PASTAS TEMPORÁRIAS
+# ==============================================================================
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
-if "preview_fixo" not in st.session_state:
-    st.session_state["preview_fixo"] = False
-
 if "aba_ativa" not in st.session_state:
     st.session_state["aba_ativa"] = "feed"
-
-if "feed_lista" not in st.session_state:
-    st.session_state["feed_lista"] = list(VIDEOS_CATALOGO)
 
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
 st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 25px;">Feed dinâmico integrado — assista às cenas em alta e corte em 1 toque</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 25px;">Sincronizado diretamente com a Planilha de Produção</div>', unsafe_allow_html=True)
 
-# NAVEGAÇÃO
 col_nav_1, col_nav_2 = st.columns(2)
 with col_nav_1:
     tipo_feed = "primary" if st.session_state["aba_ativa"] == "feed" else "secondary"
-    if st.button("🔥 Feed de Vídeos (Mineração Automática)", type=tipo_feed, use_container_width=True):
+    if st.button("🔥 Feed de Vídeos (Planilha)", type=tipo_feed, use_container_width=True):
         st.session_state["aba_ativa"] = "feed"
         st.rerun()
 
@@ -267,63 +189,45 @@ with col_nav_2:
 st.markdown("<hr style='border-color: #30363d; margin: 15px 0 25px 0;'>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ABA 1: FEED
+# ABA 1: FEED DE VÍDEOS (LIDO DA PLANILHA)
 # ==============================================================================
 if st.session_state["aba_ativa"] == "feed":
-    col_topo_feed_1, col_topo_feed_2 = st.columns([3, 1])
-    with col_topo_feed_1:
-        st.caption(f"🔄 Clipes disponíveis no radar de doramas: **{len(st.session_state['feed_lista'])}**")
-    with col_topo_feed_2:
+    videos_feed = ler_feed_da_planilha(LINK_PLANILHA_GOOGLE)
+
+    col_topo_1, col_topo_2 = st.columns([3, 1])
+    with col_topo_1:
+        st.caption(f"🔄 Clipes prontos na planilha: **{len(videos_feed)}**")
+    with col_topo_2:
         if st.button("🔄 Atualizar Feed Agora", use_container_width=True):
-            random.shuffle(st.session_state["feed_lista"])
-            st.toast("✅ Feed reorganizado com novas posições!")
+            st.cache_data.clear()
+            st.toast("✅ Planilha sincronizada com sucesso!")
             st.rerun()
 
-    with st.expander("➕ Adicionar Novo Vídeo ao Topo do Feed (Kwai ou TikTok)"):
-        col_ad1, col_ad2 = st.columns([3, 1])
-        with col_ad1:
-            novo_link = st.text_input("Cole o link de qualquer vídeo:")
-            titulo_personalizado = st.text_input("Título / Cena (Opcional):")
-        with col_ad2:
-            st.write("")
-            st.write("")
-            if st.button("Adicionar ao Feed", use_container_width=True):
-                if novo_link and novo_link.startswith("http"):
-                    st.session_state["feed_lista"].insert(0, {
-                        "canal": "Importado",
-                        "titulo": titulo_personalizado or "Cena Importada",
-                        "dorama": "Dorama em Alta",
-                        "url": novo_link
-                    })
-                    st.success("Vídeo adicionado com sucesso ao topo do feed!")
-                    st.rerun()
+    if not videos_feed:
+        st.warning("⚠️ Nenhum vídeo pronto encontrado na folha de cálculo. Verifique se a coluna URL_MP4 foi preenchida.")
+    else:
+        for idx, item in enumerate(videos_feed):
+            col_esp1, col_feed, col_esp2 = st.columns([1, 1.4, 1])
+            with col_feed:
+                st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
+                st.caption(f"📍 Rede: **{item['origem']}** | 👤 Canal: **{item['canal']}**")
 
-    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 20px 0;'>👇 <b>Deslize para baixo</b> para assistir aos clipes:</p>", unsafe_allow_html=True)
+                # O link .mp4 direto da CDN reproduz instantaneamente sem tela preta
+                st.video(item["mp4"])
 
-    for idx, item in enumerate(st.session_state["feed_lista"]):
-        col_esp1, col_feed, col_esp2 = st.columns([1, 1.4, 1])
-        with col_feed:
-            st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
-            st.caption(f"👤 Canal: **{item['canal']}** | 🎭 Dorama: **{item['dorama']}**")
+                if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_{idx}_{item['titulo'][:10]}", type="primary", use_container_width=True):
+                    with st.spinner("A carregar vídeo na bancada de corte..."):
+                        sucesso, caminho_vid = baixar_video_direto(item["mp4"], pasta_temp)
+                        if sucesso:
+                            st.session_state["video_original"] = caminho_vid
+                            st.session_state["texto_input_armazenado"] = item["titulo"]
+                            st.session_state["preview_fixo"] = True
+                            st.session_state["aba_ativa"] = "editor"
+                            st.rerun()
+                        else:
+                            st.error("Erro ao transferir este vídeo.")
 
-            # Resolução obrigatória da transmissão direta .mp4 (CDN) para nunca dar tela preta
-            url_stream_limpo = extrair_stream_mp4_real(item["url"])
-            st.video(url_stream_limpo or item["url"])
-
-            if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cortar_{idx}_{item['titulo'][:8]}", type="primary", use_container_width=True):
-                with st.spinner("A transferir vídeo para a bancada de corte..."):
-                    sucesso, c_out = descarregar_video_motor(item["url"], pasta_temp)
-                    if sucesso and tem_imagem_de_video(c_out):
-                        st.session_state["video_original"] = c_out
-                        st.session_state["texto_input_armazenado"] = item["titulo"]
-                        st.session_state["preview_fixo"] = True
-                        st.session_state["url_manual_importada"] = item["url"]
-                        st.session_state["aba_ativa"] = "editor"
-                        st.rerun()
-                    else:
-                        st.error("Não foi possível carregar este clipe.")
-
-            st.markdown("<hr style='border-color: #30363d; margin: 40px 0;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='border-color: #30363d; margin: 40px 0;'>", unsafe_allow_html=True)
 
 # ==============================================================================
 # ABA 2: EDITOR DE CORTES
@@ -336,23 +240,20 @@ elif st.session_state["aba_ativa"] == "editor":
             st.markdown("### 📁 1. Arquivos de Identidade Visual")
             col_molde, col_fonte = st.columns(2)
             with col_molde:
-                fundo_user = st.file_uploader("Molde / Layout (PNG/JPG)", type=["jpg", "jpeg", "png"])
+                fundo_user = st.file_uploader("Molde / Moldura (PNG/JPG)", type=["jpg", "jpeg", "png"])
             with col_fonte:
                 fonte_user = st.file_uploader("Fonte (TTF)", type=["ttf", "otf"])
 
     with col_topo_2:
         with st.container(border=True):
-            st.markdown("### 🔎 2. Importar Link Manual")
-            url_sugerida = st.session_state.get("url_manual_importada", "")
-            link_video = st.text_input("Cole o link (Kwai, TikTok, Insta ou Shorts):", value=url_sugerida)
-            if st.button("📥 Analisar e Extrair Vídeo", use_container_width=True):
-                if not link_video or not link_video.startswith("http"):
-                    st.warning("⚠️ Insira um link válido.")
-                else:
-                    with st.spinner("A descarregar o vídeo..."):
-                        sucesso, c_out = descarregar_video_motor(link_video, pasta_temp)
-                        if sucesso and tem_imagem_de_video(c_out):
-                            st.session_state["video_original"] = c_out
+            st.markdown("### 🔎 2. Importar Link Avulso")
+            link_avulso = st.text_input("Cole o link direto do MP4 ou vídeo:")
+            if st.button("📥 Importar para Edição", use_container_width=True):
+                if link_avulso.startswith("http"):
+                    with st.spinner("A transferir vídeo..."):
+                        sucesso, caminho_vid = baixar_video_direto(link_avulso, pasta_temp)
+                        if sucesso:
+                            st.session_state["video_original"] = caminho_vid
                             st.session_state["texto_input_armazenado"] = "ASSISTA ATÉ AO FIM"
                             st.session_state["preview_fixo"] = True
                             st.rerun()
@@ -363,7 +264,7 @@ elif st.session_state["aba_ativa"] == "editor":
 
     if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
         col_preview, col_editor = st.columns([1, 1.2])
-        
+
         with col_preview:
             with st.container(border=True):
                 st.markdown("#### 📺 Visualizador de Mídia")
@@ -372,18 +273,16 @@ elif st.session_state["aba_ativa"] == "editor":
         with col_editor:
             with st.container(border=True):
                 st.markdown("#### 🎛️ Painel de Personalização")
-                
+
                 valor_inicial = st.session_state.get("texto_input_armazenado", "ASSISTA ATÉ AO FIM")
-                texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial, key="campo_texto_destaque")
+                texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial)
                 st.session_state["texto_input_armazenado"] = texto_final
-                
+
                 col_t1, col_t2 = st.columns(2)
                 with col_t1:
-                    tamanho_fonte = st.slider("Tamanho da Fonte:", 30, 90, st.session_state.get("valor_tamanho_fonte", 65), 2, key="slider_tamanho_fonte")
-                    st.session_state["valor_tamanho_fonte"] = tamanho_fonte
+                    tamanho_fonte = st.slider("Tamanho da Fonte:", 30, 90, 65, 2)
                 with col_t2:
-                    posicao_y = st.slider("Altura do Texto (Vertical):", 300, 700, st.session_state.get("valor_posicao_y", 500), 10, key="slider_posicao_y")
-                    st.session_state["valor_posicao_y"] = posicao_y
+                    posicao_y = st.slider("Altura do Texto (Vertical):", 300, 700, 500, 10)
 
                 col_c1, col_c2 = st.columns(2)
                 with col_c1:
@@ -396,47 +295,34 @@ elif st.session_state["aba_ativa"] == "editor":
                     largura_borda = opcoes_borda[borda_nome]
                     cor_borda = "white" if cor_hex == "black" else "black"
 
-                col_b1, col_b2 = st.columns([1.5, 1])
-                with col_b1:
-                    if st.button("👁️ Abrir / Fixar Imagem", use_container_width=True):
-                        st.session_state["preview_fixo"] = True
-                        st.rerun()
-                with col_b2:
-                    if st.button("❌ Ocultar Imagem", use_container_width=True):
-                        st.session_state["preview_fixo"] = False
-                        st.rerun()
+                if fundo_user and fonte_user:
+                    l1, l2 = quebrar_duas_linhas(texto_final)
+                    caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
+                    caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
+                    caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
+                    txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
+                    txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
 
-                if st.session_state.get("preview_fixo", False):
-                    if not fundo_user or not fonte_user:
-                        st.info("ℹ️ Envie o Molde e a Fonte no Passo 1 para exibir a imagem de pré-visualização.")
-                    else:
-                        l1, l2 = quebrar_duas_linhas(texto_final)
-                        caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
-                        caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
-                        caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
-                        txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
-                        txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
+                    with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
+                    with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
+                    with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
+                    with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
 
-                        with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
-                        with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
-                        with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
-                        with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
+                    espacamento = tamanho_fonte + 20
+                    draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
+                    draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
-                        espacamento = tamanho_fonte + 20
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
-
-                        filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
-                        comando_prev = ["ffmpeg", "-y", "-i", caminho_molde_prev, "-filter_complex", filtro_prev, "-map", "[v]", "-frames:v", "1", "-update", "1", caminho_saida_prev]
-                        subprocess.run(comando_prev, check=True)
-                        st.image(caminho_saida_prev, caption=f"Altura: {posicao_y}px | Tamanho: {tamanho_fonte}px", use_container_width=True)
+                    filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
+                    comando_prev = ["ffmpeg", "-y", "-i", caminho_molde_prev, "-filter_complex", filtro_prev, "-map", "[v]", "-frames:v", "1", "-update", "1", caminho_saida_prev]
+                    subprocess.run(comando_prev, check=True)
+                    st.image(caminho_saida_prev, caption="Pré-visualização do layout", use_container_width=True)
 
                 st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
-                
+
                 modo_anti_copyright = st.checkbox("🛡️ Ativar Modo Anti-Copyright / Anti-Strike", value=True)
                 duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "Vídeo Completo"])
                 st.markdown("<br>", unsafe_allow_html=True)
-                
+
                 btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
                 if btn_gerar:
@@ -444,7 +330,6 @@ elif st.session_state["aba_ativa"] == "editor":
                         st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                     else:
                         with st.status("🎬 A renderizar o corte...", expanded=True) as status:
-                            st.write("📥 A preparar os ficheiros base...")
                             l1, l2 = quebrar_duas_linhas(texto_final)
                             caminho_molde = os.path.join(pasta_temp, "molde.jpg")
                             caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
@@ -490,12 +375,11 @@ elif st.session_state["aba_ativa"] == "editor":
                             status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
 
                         with open(caminho_saida, "rb") as f_video:
-                            st.success("O seu vídeo está pronto!")
+                            st.success("O corte está pronto!")
                             st.download_button(
                                 label="⬇️ BAIXAR VÍDEO PRONTO", 
                                 data=f_video.read(), 
                                 file_name="corte_final.mp4", 
                                 mime="video/mp4", 
-                                use_container_width=True,
-                                key="btn_download_video_final"
+                                use_container_width=True
                             )
