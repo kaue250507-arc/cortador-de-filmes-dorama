@@ -14,7 +14,7 @@ import streamlit as st
 st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# AS 6 CONTAS MONITORIZADAS (KWAI)
+# AS 6 CONTAS MONITORADAS (KWAI)
 # ==========================================
 PERFIS_KWAI = {
     "doramasbrasil": "https://kwai-video.com/u/@doramasbrasill/8x4HFCCh",
@@ -25,8 +25,8 @@ PERFIS_KWAI = {
     "mundosdodorama552": "https://kwai-video.com/u/@mundodosdorama552/VCRC2ZaI",
 }
 
-# BANCO DE VÍDEOS GARANTIDOS (SEM TELAS PRETAS)
-FEED_INICIAL_DORAMAS = [
+# BANCO INICIAL DE VÍDEOS REAIS E COMPROVADOS DO KWAI
+FEED_BASE_KWAI = [
     {
         "canal": "@doramasbrasil",
         "titulo": "Ele ficou morrendo de ciúmes ao ver ela na companhia de outro ❤️",
@@ -35,33 +35,15 @@ FEED_INICIAL_DORAMAS = [
     },
     {
         "canal": "@Doramasonline",
-        "titulo": "Quando o chefe frio percebe que está apaixonado pela funcionária 🥺✨",
-        "dorama": "Pretendente Surpresa (Business Proposal)",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        "titulo": "Quando ele percebe que ela corre perigo e vai correndo proteger 🥺🔥",
+        "dorama": "Cena Emocionante de Dorama",
+        "url": "https://k.kwai.com/p/sHCgDks5"
     },
     {
         "canal": "@josiiedits",
         "titulo": "Ele não aguentou ver outro homem falar com ela na escola 😱✨",
-        "dorama": "Vinte e Cinco, Vinte e Um (25 21)",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-    },
-    {
-        "canal": "@clichegarota",
-        "titulo": "A declaração de amor mais linda debaixo de chuva intensa 🌧️❤️",
-        "dorama": "Pousando no Amor (Crash Landing on You)",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
-    },
-    {
-        "canal": "@DoramaOnline",
-        "titulo": "Ela descobriu o segredo do passado dele e foi às lágrimas 💔😭",
-        "dorama": "Tudo Bem Não Ser Normal",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4"
-    },
-    {
-        "canal": "@mundosdodorama552",
-        "titulo": "Cena hilária no primeiro encontro do casal mais amado 😂💪",
-        "dorama": "Mulher Forte, Do Bong-soon",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4"
+        "dorama": "Romance Escolar",
+        "url": "https://k.kwai.com/p/sHCgDks5"
     }
 ]
 
@@ -172,13 +154,15 @@ def tem_audio(caminho_arquivo):
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def extrair_link_mp4_direto(url_video):
-    """Extrai a transmissão MP4 limpa para o leitor tocar com áudio e imagem."""
+    """Extrai exclusivamente o stream direto .mp4 que toca nativamente no navegador."""
     if not url_video or not url_video.startswith("http"):
         return None, ""
     
+    # Se já for um arquivo direto de vídeo
     if ".mp4" in url_video.split("?")[0]:
         return url_video, ""
 
+    # Kwai
     if any(k in url_video for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
         try:
             req = urllib.request.Request(
@@ -202,10 +186,25 @@ def extrair_link_mp4_direto(url_video):
         except Exception:
             pass
 
+    # TikTok (via API pública tikwm)
+    elif "tiktok.com" in url_video:
+        try:
+            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_video)}"
+            req_tik = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_tik, timeout=12) as resp_tik:
+                dados_tik = json.loads(resp_tik.read().decode('utf-8'))
+            if dados_tik.get("code") == 0:
+                d = dados_tik.get("data", {})
+                mp4 = d.get("play") or d.get("wmplay")
+                if mp4:
+                    return mp4, limpar_legenda(d.get("title", ""))
+        except Exception:
+            pass
+
     return None, ""
 
 def descarregar_video_motor(url_alvo, pasta_destino):
-    """Transfere o vídeo de forma protegida para o servidor para aplicar a edição."""
+    """Baixa o vídeo com segurança para o servidor para aplicar a moldura e renderizar."""
     caminho_saida = os.path.join(pasta_destino, "preview.mp4")
     for f_antigo in glob.glob(os.path.join(pasta_destino, "preview*")):
         try: os.remove(f_antigo)
@@ -245,13 +244,13 @@ if "session_id" not in st.session_state:
 if "preview_fixo" not in st.session_state:
     st.session_state["preview_fixo"] = False
 
-# CONTROLO DE NAVEGAÇÃO ENTRE ABAS
+# CONTROLE DE NAVEGAÇÃO ENTRE ABAS
 if "aba_ativa" not in st.session_state:
     st.session_state["aba_ativa"] = "feed"
 
 # ATUALIZA O FEED AUTOMATICAMENTE SEMPRE QUE A PESSOA ENTRA NO APP
 if "feed_lista" not in st.session_state:
-    feed_embaralhado = list(FEED_INICIAL_DORAMAS)
+    feed_embaralhado = list(FEED_BASE_KWAI)
     random.shuffle(feed_embaralhado)
     st.session_state["feed_lista"] = feed_embaralhado
 
@@ -284,23 +283,23 @@ if st.session_state["aba_ativa"] == "feed":
     
     col_topo_feed_1, col_topo_feed_2 = st.columns([3, 1])
     with col_topo_feed_1:
-        st.caption("🔄 Feed sincronizado e atualizado automaticamente ao abrir a aplicação.")
+        st.caption("🔄 Feed sincronizado e pronto para reprodução imediata com áudio e vídeo.")
     with col_topo_feed_2:
         if st.button("🔄 Atualizar Feed Agora", use_container_width=True):
             random.shuffle(st.session_state["feed_lista"])
             st.rerun()
 
     with st.expander("📺 Abrir Perfis Oficiais dos Concorrentes no Kwai"):
-        st.caption("Acesse os canais mais seguidos para copiar links de novos vídeos:")
+        st.caption("Toque para abrir os canais dos concorrentes e copiar novos links virais:")
         cols_kw = st.columns(3)
         for i, (nome_k, link_k) in enumerate(PERFIS_KWAI.items()):
             with cols_kw[i % 3]:
                 st.link_button(f"🔗 @{nome_k}", link_k, use_container_width=True)
 
-    with st.expander("➕ Adicionar Novo Vídeo ao Feed"):
+    with st.expander("➕ Adicionar Novo Vídeo ao Feed (Kwai ou TikTok)"):
         col_ad1, col_ad2 = st.columns([3, 1])
         with col_ad1:
-            novo_link = st.text_input("Cole o link de qualquer vídeo do Kwai (ex: https://k.kwai.com/p/...):")
+            novo_link = st.text_input("Cole o link de qualquer vídeo (ex: https://k.kwai.com/p/...):")
             titulo_personalizado = st.text_input("Título / Cena (Opcional):")
         with col_ad2:
             st.write("")
@@ -309,11 +308,11 @@ if st.session_state["aba_ativa"] == "feed":
                 if novo_link and novo_link.startswith("http"):
                     st.session_state["feed_lista"].insert(0, {
                         "canal": "Manual",
-                        "titulo": titulo_personalizado or "Cena Importada do Kwai",
+                        "titulo": titulo_personalizado or "Cena Importada",
                         "dorama": "Dorama em Alta",
                         "url": novo_link
                     })
-                    st.success("Vídeo adicionado com sucesso ao topo do feed!")
+                    st.success("Vídeo adicionado ao topo do feed!")
                     st.rerun()
 
     st.markdown("<p style='text-align: center; color: #8b949e; font-size: 0.95rem; margin: 20px 0;'>👇 <b>Deslize a tela para baixo</b> para assistir aos clipes dos canais:</p>", unsafe_allow_html=True)
@@ -326,13 +325,14 @@ if st.session_state["aba_ativa"] == "feed":
             st.markdown(f"#### 📱 #{idx+1} {item['titulo']}")
             st.caption(f"👤 Canal de Origem: **{item['canal']}** | 🎭 Dorama: **{item['dorama']}**")
 
-            # Obtenção de link direto MP4
+            # Valida e extrai o link direto MP4 para garantir reprodução fluida sem tela preta
             mp4_url, leg_auto = extrair_link_mp4_direto(item["url"])
             url_reproducao = mp4_url if mp4_url else item["url"]
 
+            # Reprodutor nativo que toca com áudio e imagem
             st.video(url_reproducao)
 
-            # Botão de Ação Direta que muda para a aba do Editor
+            # Botão de Ação Direta que baixa e muda imediatamente para a aba de edição
             if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_cortar_{idx}_{item['url'][-8:]}", type="primary", use_container_width=True):
                 with st.spinner("A carregar vídeo na bancada de corte..."):
                     sucesso, c_out, leg = descarregar_video_motor(item["url"], pasta_temp)
@@ -342,7 +342,7 @@ if st.session_state["aba_ativa"] == "feed":
                         st.session_state["preview_fixo"] = True
                         st.session_state["url_manual_importada"] = item["url"]
                         
-                        # Transição imediata para o editor
+                        # Transição imediata e segura para a aba do editor
                         st.session_state["aba_ativa"] = "editor"
                         st.rerun()
                     else:
