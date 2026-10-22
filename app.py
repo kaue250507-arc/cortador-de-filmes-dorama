@@ -168,7 +168,7 @@ pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
 st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 25px;">Sincronizado diretamente com a Planilha de Produção</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 25px;">Seu catálogo para assistir vídeos e criar novos cortes em 1 clique</div>', unsafe_allow_html=True)
 
 col_nav_1, col_nav_2 = st.columns(2)
 with col_nav_1:
@@ -197,7 +197,7 @@ if st.session_state["aba_ativa"] == "feed":
     with col_topo_2:
         if st.button("🔄 Atualizar Feed Agora", use_container_width=True):
             st.cache_data.clear()
-            st.toast("✅ Planilha sincronizada com sucesso!")
+            st.toast("✅ Feed atualizado!")
             st.rerun()
 
     if not videos_feed:
