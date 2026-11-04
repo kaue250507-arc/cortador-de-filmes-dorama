@@ -1,6 +1,7 @@
 import os
 import re
 import csv
+import json
 import uuid
 import html
 import random
@@ -108,6 +109,158 @@ def ler_feed_da_planilha(url_compartilhamento):
 
     return list(reversed(videos))
 
+def resolver_url_video_real(url_alvo):
+    """Extrai a URL direta do .mp4 de Kwai, TikTok, Instagram ou YouTube."""
+    url_limpa = url_alvo.strip()
+
+    # 1. Se já for um arquivo .mp4 direto de CDN
+    if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com"]):
+        return url_limpa, "Cena Viral de Dorama"
+
+    titulo_extraido = "ASSISTA ATÉ AO FIM"
+
+    # 2. TIKTOK (API TikWM sem marca d'água)
+    if "tiktok.com" in url_limpa:
+        try:
+            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                dados = json.loads(resp.read().decode('utf-8'))
+                if dados.get("code") == 0 and dados.get("data"):
+                    play_url = dados["data"].get("play") or dados["data"].get("wmplay")
+                    if dados["data"].get("title"):
+                        titulo_extraido = dados["data"]["title"].replace("#", " ")
+                    if play_url:
+                        return play_url, titulo_extraido
+        except Exception:
+            pass
+
+    # 3. KWAI (Varredura no HTML da CDN)
+    if any(k in url_limpa for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            req = urllib.request.Request(url_limpa, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                html_raw = resp.read().decode('utf-8', errors='ignore')
+
+            m_tit = re.search(r'<meta[^>]+(?:name|property)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
+            if m_tit and m_tit.group(1):
+                titulo_extraido = m_tit.group(1).split(":")[-1].replace('"', '').strip()
+
+            matches = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
+            for m in matches:
+                if "kwai" in m or "cdn" in m:
+                    return m, titulo_extraido
+            if matches:
+                return matches[0], titulo_extraido
+        except Exception:
+            pass
+
+    # 4. INSTAGRAM REELS (Embed captioned)
+    if "instagram.com" in url_limpa:
+        try:
+            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            req = urllib.request.Request(url_embed, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                html_ig = resp.read().decode('utf-8', errors='ignore')
+
+            m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
+                    re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
+            if m_mp4:
+                stream_mp4 = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
+                return stream_mp4, titulo_extraido
+        except Exception:
+            pass
+
+    # 5. Fallback com yt-dlp se disponível no ambiente
+    try:
+        import yt_dlp
+        ydl_opts = {'quiet': True, 'no_warnings': True, 'format': 'best[ext=mp4]/best'}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url_limpa, download=False)
+            if info.get('url'):
+                return info['url'], info.get('title', titulo_extraido)
+    except Exception:
+        pass
+
+    return url_limpa, titulo_extraido
+
+def tem_imagem_de_video(caminho_arquivo):
+    if not os.path.exists(caminho_arquivo) or os.path.getsize(caminho_arquivo) < 5000:
+        return False
+    try:
+        with open(caminho_arquivo, "rb") as f:
+            cabecalho = f.read(256)
+            if b"<!DOCTYPE" in cabecalho or b"<html" in cabecalho or b"<head" in cabecalho:
+                return False
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        return "video" in res.stdout.lower()
+    except Exception:
+        return True
+
+def tem_audio(caminho_arquivo):
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        return "audio" in res.stdout.lower()
+    except Exception:
+        return True
+
+def baixar_video_com_extracao(url_alvo, pasta_destino):
+    caminho_saida = os.path.join(pasta_destino, "preview.mp4")
+    for f in glob.glob(os.path.join(pasta_destino, "preview*")):
+        try: os.remove(f)
+        except Exception: pass
+
+    url_stream, titulo_detectado = resolver_url_video_real(url_alvo)
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': '*/*'
+    }
+
+    sucesso = False
+    try:
+        req = urllib.request.Request(url_stream, headers=headers)
+        with urllib.request.urlopen(req, timeout=35) as v_stream, open(caminho_saida, "wb") as f_out:
+            f_out.write(v_stream.read())
+        sucesso = True
+    except Exception:
+        try:
+            urllib.request.urlretrieve(url_stream, caminho_saida)
+            sucesso = True
+        except Exception:
+            sucesso = False
+
+    # Se o download retornou HTML ou arquivo inválido, tenta via yt-dlp CLI
+    if not sucesso or not tem_imagem_de_video(caminho_saida):
+        try:
+            cmd = ["yt-dlp", "-f", "best[ext=mp4]/best", "-o", caminho_saida, url_alvo, "--force-overwrites"]
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
+            if tem_imagem_de_video(caminho_saida):
+                sucesso = True
+        except Exception:
+            pass
+
+    if os.path.exists(caminho_saida) and not tem_imagem_de_video(caminho_saida):
+        try: os.remove(caminho_saida)
+        except Exception: pass
+        return False, None, ""
+
+    return sucesso, caminho_saida, titulo_detectado
+
 def quebrar_duas_linhas(frase):
     palavras = frase.split()
     if not palavras:
@@ -123,37 +276,6 @@ def quebrar_duas_linhas(frase):
         if dif < menor_dif:
             menor_dif, melhor_corte = dif, i
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
-
-def tem_audio(caminho_arquivo):
-    try:
-        res = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        return "audio" in res.stdout.lower()
-    except Exception:
-        return True
-
-def baixar_video_direto(url_alvo, pasta_destino):
-    caminho_saida = os.path.join(pasta_destino, "preview.mp4")
-    for f in glob.glob(os.path.join(pasta_destino, "preview*")):
-        try: os.remove(f)
-        except Exception: pass
-
-    sucesso = False
-    try:
-        req = urllib.request.Request(url_alvo, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=35) as v_stream, open(caminho_saida, "wb") as f_out:
-            f_out.write(v_stream.read())
-        sucesso = True
-    except Exception:
-        try:
-            urllib.request.urlretrieve(url_alvo, caminho_saida)
-            sucesso = True
-        except Exception:
-            sucesso = False
-
-    return sucesso, caminho_saida
 
 # ==============================================================================
 # SESSÃO E PASTAS TEMPORÁRIAS
@@ -213,8 +335,8 @@ if st.session_state["aba_ativa"] == "feed":
 
                 if st.button("✂️ CORTAR ESTE VÍDEO AGORA", key=f"btn_{idx}_{item['titulo'][:10]}", type="primary", use_container_width=True):
                     with st.spinner("A carregar vídeo na bancada de corte..."):
-                        sucesso, caminho_vid = baixar_video_direto(item["mp4"], pasta_temp)
-                        if sucesso:
+                        sucesso, caminho_vid, tit = baixar_video_com_extracao(item["mp4"], pasta_temp)
+                        if sucesso and tem_imagem_de_video(caminho_vid):
                             st.session_state["video_original"] = caminho_vid
                             st.session_state["texto_input_armazenado"] = item["titulo"]
                             st.session_state["preview_fixo"] = True
@@ -243,18 +365,24 @@ elif st.session_state["aba_ativa"] == "editor":
     with col_topo_2:
         with st.container(border=True):
             st.markdown("### 🔎 2. Importar Link Avulso")
-            link_avulso = st.text_input("Cole o link direto do MP4 ou vídeo:")
+            link_avulso = st.text_input("Cole qualquer link (Instagram Reels, TikTok, Kwai ou MP4):")
             if st.button("📥 Importar para Edição", use_container_width=True):
-                if link_avulso.startswith("http"):
-                    with st.spinner("A transferir vídeo..."):
-                        sucesso, caminho_vid = baixar_video_direto(link_avulso, pasta_temp)
-                        if sucesso:
+                if not link_avulso or not link_avulso.startswith("http"):
+                    st.warning("⚠️ Insira um link válido iniciado por http ou https.")
+                else:
+                    with st.spinner("A extrair vídeo original da plataforma..."):
+                        sucesso, caminho_vid, tit_detectado = baixar_video_com_extracao(link_avulso, pasta_temp)
+                        if sucesso and tem_imagem_de_video(caminho_vid):
                             st.session_state["video_original"] = caminho_vid
-                            st.session_state["texto_input_armazenado"] = "ASSISTA ATÉ AO FIM"
+                            if tit_detectado and len(tit_detectado) > 5:
+                                st.session_state["texto_input_armazenado"] = tit_detectado
+                            elif "texto_input_armazenado" not in st.session_state:
+                                st.session_state["texto_input_armazenado"] = "ASSISTA ATÉ AO FIM"
                             st.session_state["preview_fixo"] = True
+                            st.success("✅ Vídeo extraído com sucesso!")
                             st.rerun()
                         else:
-                            st.error("Não foi possível transferir este vídeo.")
+                            st.error("❌ Não foi possível extrair o vídeo deste link. Tente adicionar o link na planilha para processamento via CDN ou utilize outro link.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
