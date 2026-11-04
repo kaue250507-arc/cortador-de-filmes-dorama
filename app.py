@@ -104,6 +104,10 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
     }
+
+    hr {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -353,11 +357,9 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-# Título Principal Atualizado
+# Título Principal
 st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Filmes/Dorama</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 1rem; margin-bottom: 25px;">Editor de Cortes Virais para TikTok, Kwai e Reels</div>', unsafe_allow_html=True)
-
-st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 1rem; margin-bottom: 30px;">Editor de Cortes Virais para TikTok, Kwai e Reels</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # BANCADA DE IMPORTAÇÃO E IDENTIDADE VISUAL
@@ -395,7 +397,7 @@ with col_topo_2:
                     else:
                         st.error("❌ Não foi possível extrair o vídeo deste link.")
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
 
 # ==============================================================================
 # PAINEL DE PERSONALIZAÇÃO E EXPORTAÇÃO
@@ -455,11 +457,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 subprocess.run(comando_prev, check=True)
                 st.image(caminho_saida_prev, caption="Pré-visualização do layout", use_container_width=True)
 
-            st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 20px 0;'>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
             modo_anti_copyright = st.checkbox("🛡️ Ativar Modo Anti-Copyright / Anti-Strike", value=True)
             duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "120s", "150s", "Vídeo Completo"])
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
