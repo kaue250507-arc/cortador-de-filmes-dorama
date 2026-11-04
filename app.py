@@ -11,57 +11,128 @@ import subprocess
 import glob
 import streamlit as st
 
-st.set_page_config(page_title="Studio Dorama - Feed & Cortes", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Studio Dorama - Feed & Cortes", 
+    page_icon="🎬", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
 # ==============================================================================
 # CONFIGURAÇÃO DIRETA DA SUA PLANILHA GOOGLE
 # ==============================================================================
 LINK_PLANILHA_GOOGLE = "https://docs.google.com/spreadsheets/d/1erUG1HU4oTtdMI_KI3nEjb1imPbxgfoS2aSn3B45nt8/edit?usp=sharing"
 
+# ==============================================================================
+# DESIGN SYSTEM: VISUAL PROFISSIONAL ESTILO STREAMING (SEM CARA DE IA)
+# ==============================================================================
 st.markdown("""
 <html lang="pt" translate="no">
 <head>
     <meta name="google" content="notranslate" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 </html>
 <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-
-    .stApp { background-color: #0b0f19; }
-
-    div[data-testid="stContainer"] {
-        background-color: #161b22;
-        border-radius: 16px !important;
-        border: 1px solid #30363d !important;
-        padding: 15px;
+    /* Ocultar elementos nativos do Streamlit */
+    #MainMenu, header, footer, .stDeployButton { display: none !important; visibility: hidden !important; }
+    
+    /* Tipografia global e fundo da plataforma */
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+    }
+    .stApp {
+        background: radial-gradient(circle at 50% -10%, #1a1025 0%, #0c0f17 55%, #06080d 100%) !important;
+        color: #f1f5f9 !important;
     }
 
-    h3, h4 { color: #e6edf3 !important; font-weight: 700 !important; }
-    label { color: #c9d1d9 !important; font-weight: 600 !important; }
+    /* Cards com efeito vidro fosco (Glassmorphism) */
+    div[data-testid="stContainer"] {
+        background: rgba(18, 23, 33, 0.75) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 18px !important;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4) !important;
+        padding: 22px !important;
+        transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    div[data-testid="stContainer"]:hover {
+        border-color: rgba(255, 51, 102, 0.3) !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
+    }
 
+    /* Títulos e legendas */
+    h3, h4 {
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.4px !important;
+    }
+    label {
+        color: #94a3b8 !important;
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* Botão Principal em Gradiente Neon */
     button[kind="primary"] {
-        background: linear-gradient(135deg, #ff4b4b 0%, #ff1f1f 100%) !important;
-        color: white !important;
+        background: linear-gradient(135deg, #ff3366 0%, #ff1f44 100%) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 0.98rem !important;
+        letter-spacing: 0.5px !important;
         border: none !important;
-        border-radius: 10px !important;
-        padding: 14px 0 !important;
-        font-size: 1.05rem !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4) !important;
+        border-radius: 12px !important;
+        padding: 14px 24px !important;
+        box-shadow: 0 4px 20px rgba(255, 31, 68, 0.35) !important;
+        transition: all 0.25s ease !important;
     }
     button[kind="primary"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 22px rgba(255, 75, 75, 0.6) !important;
+        transform: translateY(-2px) scale(1.01) !important;
+        box-shadow: 0 6px 28px rgba(255, 31, 68, 0.6) !important;
     }
 
+    /* Botão Secundário */
+    button[kind="secondary"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #cbd5e1 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        backdrop-filter: blur(8px) !important;
+        transition: all 0.2s ease !important;
+    }
+    button[kind="secondary"]:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        color: #ffffff !important;
+    }
+
+    /* Inputs e Caixas de Seleção */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #0d1117 !important;
-        color: white !important;
-        border: 1px solid #30363d !important;
-        border-radius: 8px !important;
+        background-color: #0b0e14 !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
+        font-size: 0.95rem !important;
+    }
+    .stTextInput input:focus {
+        border-color: #ff3366 !important;
+        box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.25) !important;
+    }
+
+    /* Sliders */
+    div[data-baseweb="slider"] div {
+        background-color: #ff3366 !important;
+    }
+
+    /* Reprodutor de Vídeo e Imagens */
+    video, img {
+        border-radius: 14px !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -74,17 +145,15 @@ def converter_link_para_csv(link):
     return link
 
 def limpar_texto_legenda(texto):
-    """Filtra 'Video by...', curtidas, comentários e extrai a frase real do vídeo."""
+    """Filtra 'Video by...', contadores de curtidas e extrai a frase principal."""
     if not texto:
         return ""
 
-    # Descarta padrões genéricos do Instagram/Facebook
     if re.match(r'^(?:video|post)\s+by\s+', texto, re.IGNORECASE):
         return ""
 
     t = html.unescape(texto)
 
-    # Remove cabeçalho de contagem de curtidas do Instagram/Kwai
     if any(w in t.lower() for w in ["likes", "curtidas", "comments", "comentários", "video from"]):
         m_aspas = re.search(r'["“]([^"”]{5,})["”]', t)
         if m_aspas:
@@ -94,7 +163,6 @@ def limpar_texto_legenda(texto):
             if m_resto:
                 t = m_resto.group(1)
 
-    # Pega apenas a primeira linha relevante de texto antes de blocos de hashtags
     linhas = [l.strip() for l in t.splitlines() if l.strip() and not l.strip().startswith(('#', '@', '.', '-'))]
     if linhas:
         t = linhas[0]
@@ -147,11 +215,10 @@ def ler_feed_da_planilha(url_compartilhamento):
     return list(reversed(videos))
 
 def resolver_url_video_real(url_alvo):
-    """Extrai o stream .mp4 e o título limpo da cena de Instagram, TikTok ou Kwai."""
+    """Extrai a URL do vídeo .mp4 e a legenda limpa de Instagram, TikTok ou Kwai."""
     url_limpa = url_alvo.strip()
     titulo_extraido = ""
 
-    # Se já for um arquivo .mp4 direto de CDN
     if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com"]):
         return url_limpa, "Cena Viral de Dorama"
 
@@ -161,7 +228,7 @@ def resolver_url_video_real(url_alvo):
         'Accept-Language': 'pt-BR,pt;q=0.9'
     }
 
-    # 1. INSTAGRAM REELS (Embed captioned)
+    # 1. INSTAGRAM REELS
     if "instagram.com" in url_limpa:
         try:
             url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
@@ -169,7 +236,6 @@ def resolver_url_video_real(url_alvo):
             with urllib.request.urlopen(req, timeout=12) as resp:
                 html_ig = resp.read().decode('utf-8', errors='ignore')
 
-            # Extração da legenda real
             m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
             if m_caption:
                 texto_sem_user = re.sub(r'<a[^>]*class=["\']CaptionUsername["\'][^>]*>[\s\S]*?<\/a>', '', m_caption.group(1))
@@ -193,7 +259,7 @@ def resolver_url_video_real(url_alvo):
         except Exception:
             pass
 
-    # 2. TIKTOK (API TikWM)
+    # 2. TIKTOK
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -243,14 +309,12 @@ def resolver_url_video_real(url_alvo):
         except Exception:
             pass
 
-    # 4. Fallback com yt-dlp (Priorizando descrição ao invés do título genérico)
+    # 4. Fallback com yt-dlp
     try:
         import yt_dlp
         ydl_opts = {'quiet': True, 'no_warnings': True, 'format': 'best[ext=mp4]/best'}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url_limpa, download=False)
-            
-            # Prioriza a descrição (onde está o texto do Reel)
             if info.get('description'):
                 cand = limpar_texto_legenda(info.get('description'))
                 if cand:
@@ -364,8 +428,8 @@ if "aba_ativa" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff4b4b, #ff7676, #ff4b4b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #8b949e; font-size: 1rem; margin-bottom: 25px;">Seu catálogo para assistir vídeos e criar novos cortes em 1 clique</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Dorama: Feed & Cortes</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 1rem; margin-bottom: 25px;">Seu catálogo para assistir vídeos e criar novos cortes em 1 clique</div>', unsafe_allow_html=True)
 
 col_nav_1, col_nav_2 = st.columns(2)
 with col_nav_1:
@@ -380,7 +444,7 @@ with col_nav_2:
         st.session_state["aba_ativa"] = "editor"
         st.rerun()
 
-st.markdown("<hr style='border-color: #30363d; margin: 15px 0 25px 0;'>", unsafe_allow_html=True)
+st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 15px 0 25px 0;'>", unsafe_allow_html=True)
 
 # ==============================================================================
 # ABA 1: FEED DE VÍDEOS (LIDO DA PLANILHA)
@@ -420,7 +484,7 @@ if st.session_state["aba_ativa"] == "feed":
                         else:
                             st.error("Erro ao transferir este vídeo.")
 
-                st.markdown("<hr style='border-color: #30363d; margin: 40px 0;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 40px 0;'>", unsafe_allow_html=True)
 
 # ==============================================================================
 # ABA 2: EDITOR DE CORTES
@@ -516,7 +580,7 @@ elif st.session_state["aba_ativa"] == "editor":
                     subprocess.run(comando_prev, check=True)
                     st.image(caminho_saida_prev, caption="Pré-visualização do layout", use_container_width=True)
 
-                st.markdown("<hr style='border-color: #30363d; margin: 20px 0;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 20px 0;'>", unsafe_allow_html=True)
 
                 modo_anti_copyright = st.checkbox("🛡️ Ativar Modo Anti-Copyright / Anti-Strike", value=True)
                 duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "Vídeo Completo"])
