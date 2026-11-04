@@ -145,7 +145,6 @@ def converter_link_para_csv(link):
     return link
 
 def limpar_texto_legenda(texto):
-    """Filtra 'Video by...', contadores de curtidas e extrai a frase principal."""
     if not texto:
         return ""
 
@@ -215,7 +214,6 @@ def ler_feed_da_planilha(url_compartilhamento):
     return list(reversed(videos))
 
 def resolver_url_video_real(url_alvo):
-    """Extrai a URL do vídeo .mp4 e a legenda limpa de Instagram, TikTok ou Kwai."""
     url_limpa = url_alvo.strip()
     titulo_extraido = ""
 
@@ -583,7 +581,7 @@ elif st.session_state["aba_ativa"] == "editor":
                 st.markdown("<hr style='border-color: rgba(255,255,255,0.08); margin: 20px 0;'>", unsafe_allow_html=True)
 
                 modo_anti_copyright = st.checkbox("🛡️ Ativar Modo Anti-Copyright / Anti-Strike", value=True)
-                duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "Vídeo Completo"])
+                duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "120s", "150s", "Vídeo Completo"])
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
@@ -629,7 +627,7 @@ elif st.session_state["aba_ativa"] == "editor":
                                 comando.extend(["-map", mapa_audio[0], "-c:a", "aac"])
                             comando.extend(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"])
 
-                            mapa_dur = {"30s": "30", "50s": "50", "60s": "60"}
+                            mapa_dur = {"30s": "30", "50s": "50", "60s": "60", "120s": "120", "150s": "150"}
                             if duracao in mapa_dur:
                                 comando.extend(["-t", mapa_dur[duracao]])
                             comando.append(caminho_saida)
