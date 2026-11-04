@@ -73,6 +73,43 @@ def converter_link_para_csv(link):
         return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
     return link
 
+def limpar_texto_legenda(texto):
+    """Filtra 'Video by...', curtidas, comentários e extrai a frase real do vídeo."""
+    if not texto:
+        return ""
+
+    # Descarta padrões genéricos do Instagram/Facebook
+    if re.match(r'^(?:video|post)\s+by\s+', texto, re.IGNORECASE):
+        return ""
+
+    t = html.unescape(texto)
+
+    # Remove cabeçalho de contagem de curtidas do Instagram/Kwai
+    if any(w in t.lower() for w in ["likes", "curtidas", "comments", "comentários", "video from"]):
+        m_aspas = re.search(r'["“]([^"”]{5,})["”]', t)
+        if m_aspas:
+            t = m_aspas.group(1)
+        else:
+            m_resto = re.search(r':\s*["\']?(.*)', t)
+            if m_resto:
+                t = m_resto.group(1)
+
+    # Pega apenas a primeira linha relevante de texto antes de blocos de hashtags
+    linhas = [l.strip() for l in t.splitlines() if l.strip() and not l.strip().startswith(('#', '@', '.', '-'))]
+    if linhas:
+        t = linhas[0]
+
+    t = re.sub(r'#\S+', '', t)
+    t = re.sub(r'@\S+', '', t)
+    t = re.sub(r'https?://\S+', '', t)
+    t = t.strip(' "\'“”-–:()[]{}')
+    t = re.sub(r'\s+', ' ', t).strip()
+
+    if re.match(r'^(?:video|post)\s+by\s+', t, re.IGNORECASE):
+        return ""
+
+    return t
+
 @st.cache_data(ttl=15, show_spinner=False)
 def ler_feed_da_planilha(url_compartilhamento):
     if not url_compartilhamento:
@@ -110,16 +147,53 @@ def ler_feed_da_planilha(url_compartilhamento):
     return list(reversed(videos))
 
 def resolver_url_video_real(url_alvo):
-    """Extrai a URL direta do .mp4 de Kwai, TikTok, Instagram ou YouTube."""
+    """Extrai o stream .mp4 e o título limpo da cena de Instagram, TikTok ou Kwai."""
     url_limpa = url_alvo.strip()
+    titulo_extraido = ""
 
-    # 1. Se já for um arquivo .mp4 direto de CDN
+    # Se já for um arquivo .mp4 direto de CDN
     if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com"]):
         return url_limpa, "Cena Viral de Dorama"
 
-    titulo_extraido = "ASSISTA ATÉ AO FIM"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9'
+    }
 
-    # 2. TIKTOK (API TikWM sem marca d'água)
+    # 1. INSTAGRAM REELS (Embed captioned)
+    if "instagram.com" in url_limpa:
+        try:
+            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
+            req = urllib.request.Request(url_embed, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                html_ig = resp.read().decode('utf-8', errors='ignore')
+
+            # Extração da legenda real
+            m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
+            if m_caption:
+                texto_sem_user = re.sub(r'<a[^>]*class=["\']CaptionUsername["\'][^>]*>[\s\S]*?<\/a>', '', m_caption.group(1))
+                texto_puro = re.sub(r'<[^>]+>', '', texto_sem_user)
+                candidato = limpar_texto_legenda(texto_puro)
+                if candidato:
+                    titulo_extraido = candidato
+
+            if not titulo_extraido:
+                m_og = re.search(r'<meta[^>]+(?:property|name)=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']', html_ig)
+                if m_og:
+                    candidato = limpar_texto_legenda(m_og.group(1))
+                    if candidato:
+                        titulo_extraido = candidato
+
+            m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
+                    re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
+            if m_mp4:
+                stream_mp4 = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
+                return stream_mp4, (titulo_extraido or "ASSISTA ATÉ AO FIM")
+        except Exception:
+            pass
+
+    # 2. TIKTOK (API TikWM)
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -129,68 +203,70 @@ def resolver_url_video_real(url_alvo):
                 if dados.get("code") == 0 and dados.get("data"):
                     play_url = dados["data"].get("play") or dados["data"].get("wmplay")
                     if dados["data"].get("title"):
-                        titulo_extraido = dados["data"]["title"].replace("#", " ")
+                        candidato = limpar_texto_legenda(dados["data"]["title"])
+                        if candidato:
+                            titulo_extraido = candidato
                     if play_url:
-                        return play_url, titulo_extraido
+                        return play_url, (titulo_extraido or "ASSISTA ATÉ AO FIM")
         except Exception:
             pass
 
-    # 3. KWAI (Varredura no HTML da CDN)
+    # 3. KWAI
     if any(k in url_limpa for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-            }
             req = urllib.request.Request(url_limpa, headers=headers)
             with urllib.request.urlopen(req, timeout=12) as resp:
                 html_raw = resp.read().decode('utf-8', errors='ignore')
 
-            m_tit = re.search(r'<meta[^>]+(?:name|property)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
-            if m_tit and m_tit.group(1):
-                titulo_extraido = m_tit.group(1).split(":")[-1].replace('"', '').strip()
+            m_cap = re.search(r'"caption"\s*:\s*"((?:\\.|[^"\\])+)"', html_raw)
+            if m_cap:
+                try:
+                    candidato = limpar_texto_legenda(json.loads('"' + m_cap.group(1) + '"'))
+                except Exception:
+                    candidato = limpar_texto_legenda(m_cap.group(1))
+                if candidato:
+                    titulo_extraido = candidato
+
+            if not titulo_extraido:
+                m_tit = re.search(r'<meta[^>]+(?:name|property)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_raw, re.IGNORECASE)
+                if m_tit and m_tit.group(1):
+                    candidato = limpar_texto_legenda(m_tit.group(1))
+                    if candidato:
+                        titulo_extraido = candidato
 
             matches = re.findall(r'https://[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_raw.replace(r'\/', '/'))
             for m in matches:
                 if "kwai" in m or "cdn" in m:
-                    return m, titulo_extraido
+                    return m, (titulo_extraido or "ASSISTA ATÉ AO FIM")
             if matches:
-                return matches[0], titulo_extraido
+                return matches[0], (titulo_extraido or "ASSISTA ATÉ AO FIM")
         except Exception:
             pass
 
-    # 4. INSTAGRAM REELS (Embed captioned)
-    if "instagram.com" in url_limpa:
-        try:
-            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-            }
-            req = urllib.request.Request(url_embed, headers=headers)
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                html_ig = resp.read().decode('utf-8', errors='ignore')
-
-            m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
-                    re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
-            if m_mp4:
-                stream_mp4 = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
-                return stream_mp4, titulo_extraido
-        except Exception:
-            pass
-
-    # 5. Fallback com yt-dlp se disponível no ambiente
+    # 4. Fallback com yt-dlp (Priorizando descrição ao invés do título genérico)
     try:
         import yt_dlp
         ydl_opts = {'quiet': True, 'no_warnings': True, 'format': 'best[ext=mp4]/best'}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url_limpa, download=False)
+            
+            # Prioriza a descrição (onde está o texto do Reel)
+            if info.get('description'):
+                cand = limpar_texto_legenda(info.get('description'))
+                if cand:
+                    titulo_extraido = cand
+
+            if not titulo_extraido and info.get('title'):
+                cand = limpar_texto_legenda(info.get('title'))
+                if cand:
+                    titulo_extraido = cand
+
             if info.get('url'):
-                return info['url'], info.get('title', titulo_extraido)
+                return info['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
     except Exception:
         pass
 
-    return url_limpa, titulo_extraido
+    return url_limpa, (titulo_extraido or "ASSISTA ATÉ AO FIM")
 
 def tem_imagem_de_video(caminho_arquivo):
     if not os.path.exists(caminho_arquivo) or os.path.getsize(caminho_arquivo) < 5000:
@@ -244,7 +320,6 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         except Exception:
             sucesso = False
 
-    # Se o download retornou HTML ou arquivo inválido, tenta via yt-dlp CLI
     if not sucesso or not tem_imagem_de_video(caminho_saida):
         try:
             cmd = ["yt-dlp", "-f", "best[ext=mp4]/best", "-o", caminho_saida, url_alvo, "--force-overwrites"]
@@ -374,15 +449,15 @@ elif st.session_state["aba_ativa"] == "editor":
                         sucesso, caminho_vid, tit_detectado = baixar_video_com_extracao(link_avulso, pasta_temp)
                         if sucesso and tem_imagem_de_video(caminho_vid):
                             st.session_state["video_original"] = caminho_vid
-                            if tit_detectado and len(tit_detectado) > 5:
+                            if tit_detectado and len(tit_detectado) > 3:
                                 st.session_state["texto_input_armazenado"] = tit_detectado
-                            elif "texto_input_armazenado" not in st.session_state:
+                            else:
                                 st.session_state["texto_input_armazenado"] = "ASSISTA ATÉ AO FIM"
                             st.session_state["preview_fixo"] = True
                             st.success("✅ Vídeo extraído com sucesso!")
                             st.rerun()
                         else:
-                            st.error("❌ Não foi possível extrair o vídeo deste link. Tente adicionar o link na planilha para processamento via CDN ou utilize outro link.")
+                            st.error("❌ Não foi possível extrair o vídeo deste link.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
