@@ -198,6 +198,18 @@ def resolver_url_video_real(url_alvo):
     url_limpa = url_alvo.strip()
     titulo_extraido = ""
     
+    # Expande links encurtados comuns (como k.kwai.com, youtu.be, vm.tiktok.com)
+    if any(k in url_limpa for k in ["k.kwai.com", "kwai.com", "youtu.be", "vm.tiktok.com", "vt.tiktok.com", "instagram.com"]):
+        try:
+            req_redirect = urllib.request.Request(
+                url_limpa, 
+                headers={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'}
+            )
+            with urllib.request.urlopen(req_redirect, timeout=10) as resp:
+                url_limpa = resp.url
+        except:
+            pass
+
     if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com", "youtube.com", "youtu.be"]):
         return url_limpa, "Cena Viral de Dorama"
 
@@ -208,7 +220,8 @@ def resolver_url_video_real(url_alvo):
             'quiet': True, 
             'no_warnings': True, 
             'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=acodec=mp4]/best[ext=mp4]/best',
-            'extractor_args': {'generic': {'impersonate': True}}
+            'extractor_args': {'generic': {'impersonate': True}},
+            'http_headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url_limpa, download=False)
