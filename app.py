@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# DESIGN SYSTEM: VISUAL PROFISSIONAL
+# DESIGN SYSTEM: OTIMIZADO PARA MOBILE E DESKTOP
 # ==============================================================================
 st.markdown("""
 <html lang="pt" translate="no">
@@ -47,14 +47,19 @@ st.markdown("""
         backdrop-filter: blur(14px) !important;
         -webkit-backdrop-filter: blur(14px) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 18px !important;
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4) !important;
-        padding: 22px !important;
-        transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+        padding: 18px !important;
+        margin-bottom: 12px !important;
     }
-    div[data-testid="stContainer"]:hover {
-        border-color: rgba(255, 51, 102, 0.3) !important;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
+
+    @media (max-width: 768px) {
+        div[data-testid="stContainer"] {
+            padding: 12px !important;
+            border-radius: 14px !important;
+        }
+        h3 { font-size: 1.25rem !important; }
+        h4 { font-size: 1.05rem !important; }
     }
 
     h3, h4 {
@@ -64,7 +69,7 @@ st.markdown("""
     }
     label {
         color: #94a3b8 !important;
-        font-size: 0.88rem !important;
+        font-size: 0.85rem !important;
         font-weight: 600 !important;
     }
 
@@ -72,11 +77,11 @@ st.markdown("""
         background: linear-gradient(135deg, #ff3366 0%, #ff1f44 100%) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 0.98rem !important;
+        font-size: 1rem !important;
         letter-spacing: 0.5px !important;
         border: none !important;
         border-radius: 12px !important;
-        padding: 14px 24px !important;
+        padding: 14px 20px !important;
         box-shadow: 0 4px 20px rgba(255, 31, 68, 0.35) !important;
         transition: all 0.25s ease !important;
     }
@@ -98,7 +103,7 @@ st.markdown("""
     }
 
     video, img {
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
     }
@@ -108,7 +113,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ALGORITMO DE DETEÇÃO INTELIGENTE DE CORTES (OPENCV)
+# ALGORITMO DE DETECÇÃO INTELIGENTE DE CORTES (OPENCV)
 # ==============================================================================
 def detectar_crop_inteligente(caminho_video):
     cap = cv2.VideoCapture(caminho_video)
@@ -305,38 +310,37 @@ if "session_id" not in st.session_state:
 pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
 os.makedirs(pasta_temp, exist_ok=True)
 
-st.markdown('<div style="text-align:center; font-size: 2.6rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Filmes/Dorama</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 1rem; margin-bottom: 30px;">Editor Inteligente de Cortes com Enquadramento Automático</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; font-size: 2.3rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Filmes/Dorama</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 0.95rem; margin-bottom: 25px;">Editor Rápido de Cortes Verticais</div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# BANCADA DE IMPORTAÇÃO E IDENTIDADE VISUAL
+# 1. IDENTIDADE VISUAL E IMPORTAÇÃO
 # ==============================================================================
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
 with col_topo_1:
     with st.container(border=True):
-        st.markdown("### 📁 1. Arquivos de Identidade Visual")
+        st.markdown("### 📁 1. Identidade Visual")
         col_molde, col_fonte = st.columns(2)
         with col_molde:
-            fundo_user = st.file_uploader("Molde / Moldura (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            fundo_user = st.file_uploader("Molde Rosa (PNG/JPG)", type=["jpg", "jpeg", "png"])
         with col_fonte:
             fonte_user = st.file_uploader("Fonte (TTF/OTF)", type=["ttf", "otf"])
 
 with col_topo_2:
     with st.container(border=True):
         st.markdown("### 🔎 2. Importar Vídeo")
-        link_avulso = st.text_input("Cole o link (Instagram Reels, TikTok, Kwai ou MP4):")
+        link_avulso = st.text_input("Cole o link (Reels, TikTok, Kwai ou MP4):")
         if st.button("📥 Carregar Vídeo", use_container_width=True):
             if not link_avulso or not link_avulso.startswith("http"):
                 st.warning("⚠️ Insira um link válido iniciado por http ou https.")
             else:
-                with st.spinner("A transferir e analisar vídeo com IA..."):
+                with st.spinner("Baixando e analisando com IA..."):
                     sucesso, caminho_vid, tit_detectado = baixar_video_com_extracao(link_avulso, pasta_temp)
                     if sucesso and tem_imagem_de_video(caminho_vid):
                         st.session_state["video_original"] = caminho_vid
                         st.session_state["texto_input_armazenado"] = tit_detectado if tit_detectado else "ASSISTA ATÉ AO FIM"
                         
-                        # Executa a deteção inteligente no momento de download
                         x, y, w, h, frame_ref = detectar_crop_inteligente(caminho_vid)
                         st.session_state["crop_x"], st.session_state["crop_y"] = x, y
                         st.session_state["crop_w"], st.session_state["crop_h"] = w, h
@@ -347,21 +351,22 @@ with col_topo_2:
                             cv2.imwrite(caminho_ref, frame_ref)
                             st.session_state["frame_ref_path"] = caminho_ref
 
-                        st.success("✅ Vídeo carregado e corte detetado automaticamente!")
+                        st.success("✅ Vídeo pronto para edição!")
                         st.rerun()
                     else:
-                        st.error("❌ Não foi possível extrair o vídeo deste link.")
+                        st.error("❌ Não foi possível carregar este vídeo.")
 
-st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# PAINEL DE PERSONALIZAÇÃO E EXPORTAÇÃO
+# 2. VÍDEO ORIGINAL E PAINEL DE PERSONALIZAÇÃO (COM MOLDE ROSA EMBAIXO)
 # ==============================================================================
 if "video_original" in st.session_state and os.path.exists(st.session_state["video_original"]):
     orig_w = st.session_state.get("orig_w", 1080)
     orig_h = st.session_state.get("orig_h", 1920)
 
     col_preview, col_editor = st.columns([1, 1.2])
+    
     with col_preview:
         with st.container(border=True):
             st.markdown("#### 📺 Vídeo Original")
@@ -369,7 +374,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
     with col_editor:
         with st.container(border=True):
-            st.markdown("#### 🎛️ Painel de Personalização")
+            st.markdown("#### 🎛️ Personalização do Título")
             
             valor_inicial = st.session_state.get("texto_input_armazenado", "ASSISTA ATÉ AO FIM")
             texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial)
@@ -377,7 +382,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
             col_t1, col_t2 = st.columns(2)
             with col_t1: tamanho_fonte = st.slider("Tamanho da Fonte:", 30, 90, 65, 2)
-            with col_t2: posicao_y = st.slider("Altura do Texto (Vertical):", 150, 600, 320, 10)
+            with col_t2: posicao_y = st.slider("Altura do Texto (Vertical):", 150, 700, 320, 10)
 
             col_c1, col_c2 = st.columns(2)
             with col_c1:
@@ -390,12 +395,41 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 largura_borda = opcoes_borda[borda_nome]
                 cor_borda = "white" if cor_hex == "black" else "black"
 
-    # ==========================================================================
-    # SECÇÃO DEDICADA: AJUSTE DE CORTE (IA + MANUAL)
-    # ==========================================================================
+            # PRÉ-VISUALIZAÇÃO DO MOLDE ROSA COM O TÍTULO EMBAIXO DO TEXTO
+            if fundo_user and fonte_user:
+                l1, l2 = quebrar_duas_linhas(texto_final)
+                caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
+                caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
+                caminho_saida_prev = os.path.join(pasta_temp, "preview_texto.jpg")
+                txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
+                txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
+
+                with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
+                with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
+                with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
+                with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
+
+                espacamento = tamanho_fonte + 18
+                draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
+                draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
+
+                filtro_prev = f"[0:v]scale=1080:1920[fundo];[fundo]{draw_l1},{draw_l2}[v]"
+                comando_prev = ["ffmpeg", "-y", "-i", caminho_molde_prev, "-filter_complex", filtro_prev, "-map", "[v]", "-frames:v", "1", "-update", "1", caminho_saida_prev]
+                try:
+                    subprocess.run(comando_prev, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                    if os.path.exists(caminho_saida_prev):
+                        st.image(caminho_saida_prev, caption="Pré-visualização do Molde com Título", use_container_width=True)
+                except Exception:
+                    pass
+            elif not fundo_user or not fonte_user:
+                st.info("💡 Envie o Molde e a Fonte no Passo 1 para ver a prévia aqui.")
+
+    # ==============================================================================
+    # 3. ENQUADRAMENTO E CORTE DE BORDAS
+    # ==============================================================================
     with st.container(border=True):
-        st.markdown("### ✂️ Enquadramento Inteligente e Corte de Bordas")
-        st.write("O sistema detetou automaticamente a área útil do dorama. Utilize os controlos deslizantes abaixo se pretender fazer um ajuste fino manual:")
+        st.markdown("### ✂️ Enquadramento e Corte de Bordas")
+        st.write("Ajuste as margens para remover fundos roxos ou legendas indesejadas:")
 
         init_top = st.session_state.get("crop_y", 0)
         init_h = st.session_state.get("crop_h", orig_h)
@@ -406,16 +440,16 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
         col_crop_sliders, col_crop_prev = st.columns([1.2, 1])
         with col_crop_sliders:
-            corte_topo = st.slider("✂️ Cortar do Topo (píxeis):", 0, int(orig_h * 0.7), int(init_top), step=4)
-            corte_base = st.slider("✂️ Cortar da Base (píxeis):", 0, int(orig_h * 0.7), int(init_bottom), step=4)
+            corte_topo = st.slider("✂️ Cortar do Topo (pixels):", 0, int(orig_h * 0.7), int(init_top), step=4)
+            corte_base = st.slider("✂️ Cortar da Base (pixels):", 0, int(orig_h * 0.7), int(init_bottom), step=4)
             
-            col_laterais_1, col_laterais_2 = st.columns(2)
-            with col_laterais_1: corte_esq = st.slider("Cortar Esquerda:", 0, int(orig_w * 0.4), int(init_left), step=4)
-            with col_laterais_2: corte_dir = st.slider("Cortar Direita:", 0, int(orig_w * 0.4), int(init_right), step=4)
+            col_l1, col_l2 = st.columns(2)
+            with col_l1: corte_esq = st.slider("Cortar Esquerda:", 0, int(orig_w * 0.4), int(init_left), step=4)
+            with col_l2: corte_dir = st.slider("Cortar Direita:", 0, int(orig_w * 0.4), int(init_right), step=4)
 
-            pos_y_video = st.slider("📍 Posição Vertical do Vídeo na Moldura:", 400, 1100, 640, 10, help="Define a posição do vídeo na moldura (por baixo de 'Sinopse').")
+            pos_y_video = st.slider("📍 Posição do Vídeo na Moldura:", 400, 1100, 640, 10, help="Altura onde o vídeo será colocado abaixo de 'Sinopse'.")
 
-            if st.button("🔄 Recalcular com IA"):
+            if st.button("🔄 Recalcular Corte com IA"):
                 x, y, w, h, _ = detectar_crop_inteligente(st.session_state["video_original"])
                 st.session_state["crop_x"], st.session_state["crop_y"] = x, y
                 st.session_state["crop_w"], st.session_state["crop_h"] = w, h
@@ -434,49 +468,17 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 if ref_img is not None:
                     pedaco_cortado = ref_img[final_y : final_y + final_h, final_x : final_x + final_w]
                     pedaco_rgb = cv2.cvtColor(pedaco_cortado, cv2.COLOR_BGR2RGB)
-                    st.image(pedaco_rgb, caption="Corte Ativo (Pré-visualização em Tempo Real)", use_container_width=True)
+                    st.image(pedaco_rgb, caption="Corte Ativo do Vídeo", use_container_width=True)
 
-    # ==========================================================================
-    # PRÉ-VISUALIZAÇÃO DA PUBLICAÇÃO COMPLETA E RENDERIZAÇÃO
-    # ==========================================================================
+    # ==============================================================================
+    # 4. CONFIGURAÇÃO FINAL E RENDERIZAÇÃO
+    # ==============================================================================
     with st.container(border=True):
-        st.markdown("### 🖼️ Pré-visualização da Publicação Completa")
+        st.markdown("### 🚀 Exportação")
         
-        if fundo_user and fonte_user:
-            l1, l2 = quebrar_duas_linhas(texto_final)
-            caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
-            caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
-            caminho_saida_prev = os.path.join(pasta_temp, "preview_layout.jpg")
-            txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
-            txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
-
-            with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
-            with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
-            with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
-            with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
-
-            espacamento = tamanho_fonte + 18
-            draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
-            draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
-
-            filtro_prev = (
-                f"[0:v]scale=1080:1920[fundo];"
-                f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2[vid];"
-                f"[fundo][vid]overlay=(W-w)/2:{pos_y_video}[base];"
-                f"[base]{draw_l1},{draw_l2}[v]"
-            )
-            comando_prev = ["ffmpeg", "-y", "-i", caminho_molde_prev, "-ss", "3", "-i", st.session_state["video_original"], "-filter_complex", filtro_prev, "-map", "[v]", "-frames:v", "1", "-update", "1", caminho_saida_prev]
-            try:
-                subprocess.run(comando_prev, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if os.path.exists(caminho_saida_prev): st.image(caminho_saida_prev, caption="Formato Final Renderizado", use_container_width=True)
-            except: pass
-        else:
-            st.info("💡 Envie a sua moldura e ficheiro de fonte no Passo 1 para visualizar a montagem completa.")
-
-        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
         col_cfg1, col_cfg2 = st.columns(2)
-        with col_cfg1: modo_anti_copyright = st.checkbox("🛡️ Ativar Modo Anti-Copyright (Velocidade +3%)", value=True)
-        with col_cfg2: duracao = st.selectbox("Duração Final do Vídeo:", ["30s", "50s", "60s", "120s", "150s", "Vídeo Completo"])
+        with col_cfg1: modo_anti_copyright = st.checkbox("🛡️ Modo Anti-Copyright (+3% de Velocidade)", value=True)
+        with col_cfg2: duracao = st.selectbox("Duração do Vídeo:", ["30s", "50s", "60s", "120s", "150s", "Vídeo Completo"])
 
         btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
@@ -484,7 +486,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             if not fundo_user or not fonte_user:
                 st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
             else:
-                with st.status("🎬 A renderizar vídeo com corte inteligente...", expanded=True) as status:
+                with st.status("🎬 Renderizando vídeo final...", expanded=True) as status:
                     l1, l2 = quebrar_duas_linhas(texto_final)
                     caminho_molde = os.path.join(pasta_temp, "molde.jpg")
                     caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
@@ -524,8 +526,14 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     comando.append(caminho_saida)
 
                     subprocess.run(comando, check=True)
-                    status.update(label="✅ Renderização concluída com sucesso!", state="complete", expanded=False)
+                    status.update(label="✅ Vídeo renderizado com sucesso!", state="complete", expanded=False)
 
                 with open(caminho_saida, "rb") as f_video:
-                    st.success("O corte está pronto e enquadrado perfeitamente!")
-                    st.download_button(label="⬇️ TRANSFERIR VÍDEO PRONTO", data=f_video.read(), file_name="corte_final.mp4", mime="video/mp4", use_container_width=True)
+                    st.success("O corte final está pronto!")
+                    st.download_button(
+                        label="⬇️ BAIXAR VÍDEO PRONTO", 
+                        data=f_video.read(), 
+                        file_name="corte_final.mp4", 
+                        mime="video/mp4", 
+                        use_container_width=True
+                    )
