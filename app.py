@@ -198,44 +198,35 @@ def resolver_url_video_real(url_alvo):
     url_limpa = url_alvo.strip()
     titulo_extraido = ""
     
-    # Suporte robusto para desvendar links encurtados do Kwai (k.kwai.com)
-    if "kwai.com" in url_limpa:
-        try:
-            req_kwai = urllib.request.Request(
-                url_limpa, 
-                headers={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15'}
-            )
-            with urllib.request.urlopen(req_kwai, timeout=8) as resp:
-                html_kwai = resp.read().decode('utf-8', errors='ignore')
-                m_vid = re.search(r'property="og:video"\s+content="([^"]+)"', html_kwai) or re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_kwai)
-                if m_vid:
-                    url_mp4 = m_vid.group(1).replace('&amp;', '&')
-                    m_desc = re.search(r'property="og:description"\s+content="([^"]+)"', html_kwai)
-                    if m_desc:
-                        titulo_extraido = limpar_texto_legenda(m_desc.group(1))
-                    return url_mp4, (titulo_extraido or "ASSISTA ATÉ AO FIM")
-        except:
-            pass
-
-    if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com"]):
+    if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com", "youtube.com", "youtu.be"]):
         return url_limpa, "Cena Viral de Dorama"
     
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': '*/*'}
+    # 1. Tenta extrair primeiro usando o motor yt-dlp atualizado (suporta Kwai, TikTok, YouTube, Instagram)
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'quiet': True, 
+            'no_warnings': True, 
+            'format': 'best[ext=mp4]/best',
+            'extractor_args': {'generic': {'impersonate': True}}
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url_limpa, download=False)
+            if info.get('description'):
+                cand = limpar_texto_legenda(info.get('description'))
+                if cand: titulo_extraido = cand
+            if not titulo_extraido and info.get('title'):
+                cand = limpar_texto_legenda(info.get('title'))
+                if cand: titulo_extraido = cand
+            if info.get('url'):
+                return info['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
+            elif 'entries' in info and len(info['entries']) > 0:
+                primeiro = info['entries'][0]
+                if primeiro.get('url'):
+                    return primeiro['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
+    except: pass
 
-    if "instagram.com" in url_limpa:
-        try:
-            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
-            req = urllib.request.Request(url_embed, headers=headers)
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                html_ig = resp.read().decode('utf-8', errors='ignore')
-            m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
-            if m_caption:
-                candidato = limpar_texto_legenda(re.sub(r'<[^>]+>', '', re.sub(r'<a[^>]*class=["\']CaptionUsername["\'][^>]*>[\s\S]*?<\/a>', '', m_caption.group(1))))
-                if candidato: titulo_extraido = candidato
-            m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
-            if m_mp4: return m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/'), (titulo_extraido or "ASSISTA ATÉ AO FIM")
-        except: pass
-
+    # 2. Fallback específico para TikTok via API tikwm
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -250,20 +241,27 @@ def resolver_url_video_real(url_alvo):
                     if play_url: return play_url, (titulo_extraido or "ASSISTA ATÉ AO FIM")
         except: pass
 
-    try:
-        import yt_dlp
-        ydl_opts = {'quiet': True, 'no_warnings': True, 'format': 'best[ext=mp4]/best'}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url_limpa, download=False)
-            if info.get('description'):
-                cand = limpar_texto_legenda(info.get('description'))
-                if cand: titulo_extraido = cand
-            if not titulo_extraido and info.get('title'):
-                cand = limpar_texto_legenda(info.get('title'))
-                if cand: titulo_extraido = cand
-            if info.get('url'):
-                return info['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
-    except: pass
+    # 3. Fallback dedicado para Kwai caso o yt-dlp encontre barreiras de requisição direta
+    if "kwai.com" in url_limpa:
+        try:
+            req_kwai = urllib.request.Request(
+                url_limpa, 
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                }
+            )
+            with urllib.request.urlopen(req_kwai, timeout=10) as resp:
+                html_kwai = resp.read().decode('utf-8', errors='ignore')
+                m_vid = re.search(r'property="og:video"\s+content="([^"]+)"', html_kwai) or re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_kwai)
+                if m_vid:
+                    url_mp4 = m_vid.group(1).replace('&amp;', '&')
+                    m_desc = re.search(r'property="og:description"\s+content="([^"]+)"', html_kwai)
+                    if m_desc:
+                        titulo_extraido = limpar_texto_legenda(m_desc.group(1))
+                    return url_mp4, (titulo_extraido or "ASSISTA ATÉ AO FIM")
+        except: pass
+
     return url_limpa, (titulo_extraido or "ASSISTA ATÉ AO FIM")
 
 def tem_imagem_de_video(caminho_arquivo):
@@ -285,28 +283,34 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         try: os.remove(f)
         except: pass
 
+    # Tenta baixar diretamente usando o yt-dlp (gerencia formatos e união de áudio/vídeo perfeitamente)
+    try:
+        import yt_dlp
+        ydl_opts = {
+            'format': 'best[ext=mp4]/best',
+            'outtmpl': caminho_saida,
+            'force_overwrites': True,
+            'quiet': True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url_alvo])
+        if tem_imagem_de_video(caminho_saida):
+            _, titulo_detectado = resolver_url_video_real(url_alvo)
+            return True, caminho_saida, titulo_detectado
+    except: pass
+
+    # Se falhar, tenta resolver a URL de streaming e baixar via urllib
     url_stream, titulo_detectado = resolver_url_video_real(url_alvo)
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': '*/*'}
-    sucesso = False
     try:
         req = urllib.request.Request(url_stream, headers=headers)
         with urllib.request.urlopen(req, timeout=35) as v_stream, open(caminho_saida, "wb") as f_out:
             f_out.write(v_stream.read())
-        sucesso = True
-    except:
-        try:
-            urllib.request.urlretrieve(url_stream, caminho_saida)
-            sucesso = True
-        except: sucesso = False
+        if tem_imagem_de_video(caminho_saida):
+            return True, caminho_saida, titulo_detectado
+    except: pass
 
-    if not sucesso or not tem_imagem_de_video(caminho_saida):
-        try:
-            cmd = ["yt-dlp", "-f", "best[ext=mp4]/best", "-o", caminho_saida, url_alvo, "--force-overwrites"]
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
-            if tem_imagem_de_video(caminho_saida): sucesso = True
-        except: pass
-
-    return sucesso, caminho_saida, titulo_detectado
+    return False, caminho_saida, titulo_detectado
 
 def quebrar_duas_linhas(frase):
     palavras = frase.split()
@@ -350,7 +354,7 @@ with col_topo_1:
 with col_topo_2:
     with st.container(border=True):
         st.markdown("### 🔎 2. Importar Vídeo")
-        link_avulso = st.text_input("Cole o link (Reels, TikTok, Kwai ou MP4):")
+        link_avulso = st.text_input("Cole o link (YouTube, Kwai, TikTok, Reels ou MP4):")
         if st.button("📥 Carregar Vídeo", use_container_width=True):
             if not link_avulso or not link_avulso.startswith("http"):
                 st.warning("⚠️ Insira um link válido iniciado por http ou https.")
