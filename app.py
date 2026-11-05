@@ -418,28 +418,27 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 largura_borda = opcoes_borda[borda_nome]
                 cor_borda = "white" if cor_hex == "black" else "black"
 
-            with st.expander("✂️ Ajustar Corte Manualmente (Opcional - Script já cortou sozinho)", expanded=False):
-                st.write("A IA já calculou o melhor enquadramento. Se ainda sobrar algum pedaço indesejado, ajuste abaixo:")
-                corte_topo = st.slider("✂️ Cortar do Topo (pixels):", 0, int(orig_h * 0.7), min(init_top, int(orig_h * 0.7)), step=2)
-                corte_base = st.slider("✂️ Cortar da Base (pixels):", 0, int(orig_h * 0.7), min(init_bottom, int(orig_h * 0.7)), step=2)
-                
-                col_l1, col_l2 = st.columns(2)
-                with col_l1: corte_esq = st.slider("Cortar Esquerda:", 0, int(orig_w * 0.4), min(init_left, int(orig_w * 0.4)), step=2)
-                with col_l2: corte_dir = st.slider("Cortar Direita:", 0, int(orig_w * 0.4), min(init_right, int(orig_w * 0.4)), step=2)
-
-                pos_y_video = st.slider("📍 Altura do Vídeo na Moldura:", 350, 1000, 450, 10, help="Onde o vídeo começa na moldura")
-
-                if st.button("🔄 Recalcular Corte com IA"):
-                    x, y, w, h, _ = detectar_crop_inteligente(st.session_state["video_original"])
-                    st.session_state["crop_x"], st.session_state["crop_y"] = x, y
-                    st.session_state["crop_w"], st.session_state["crop_h"] = w, h
-                    st.rerun()
+            # Controles de corte manual sempre ativos e acessíveis fora do expander colapsado
+            st.markdown("---")
+            st.markdown("#### ✂️ Ajustar Corte e Posição do Vídeo")
             
-            if 'corte_topo' not in locals():
-                corte_topo, corte_base = init_top, init_bottom
-                corte_esq, corte_dir = init_left, init_right
-                pos_y_video = 450  # Posição ideal centralizada padrão na moldura
+            col_s1, col_s2 = st.columns(2)
+            with col_s1:
+                corte_topo = st.slider("Cortar do Topo (pixels):", 0, int(orig_h * 0.7), min(init_top, int(orig_h * 0.7)), step=2)
+                corte_esq = st.slider("Cortar Esquerda:", 0, int(orig_w * 0.4), min(init_left, int(orig_w * 0.4)), step=2)
+            with col_s2:
+                corte_base = st.slider("Cortar da Base (pixels):", 0, int(orig_h * 0.7), min(init_bottom, int(orig_h * 0.7)), step=2)
+                corte_dir = st.slider("Cortar Direita:", 0, int(orig_w * 0.4), min(init_right, int(orig_w * 0.4)), step=2)
 
+            pos_y_video = st.slider("📍 Altura do Vídeo na Moldura:", 200, 1000, 480, 10)
+
+            if st.button("🔄 Recalcular Corte com IA"):
+                x, y, w, h, _ = detectar_crop_inteligente(st.session_state["video_original"])
+                st.session_state["crop_x"], st.session_state["crop_y"] = x, y
+                st.session_state["crop_w"], st.session_state["crop_h"] = w, h
+                st.rerun()
+
+            # Dimensões finais do corte (garantindo valores pares para o encoder H.264)
             final_x = corte_esq if corte_esq % 2 == 0 else corte_esq - 1
             final_y = corte_topo if corte_topo % 2 == 0 else corte_topo - 1
             final_w = max(100, orig_w - corte_esq - corte_dir)
@@ -467,7 +466,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
                 draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
-                # Redimensiona o vídeo para caber perfeitamente na janela central do molde e o posiciona com precisão
                 filtro_prev = (
                     f"[1:v]scale=1080:1920[fundo];"
                     f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=860:-2[vid];"
