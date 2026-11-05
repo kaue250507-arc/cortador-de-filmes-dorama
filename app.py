@@ -418,7 +418,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 largura_borda = opcoes_borda[borda_nome]
                 cor_borda = "white" if cor_hex == "black" else "black"
 
-            # Controles de corte manual sempre ativos e acessíveis fora do expander colapsado
             st.markdown("---")
             st.markdown("#### ✂️ Ajustar Corte e Posição do Vídeo")
             
@@ -438,7 +437,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 st.session_state["crop_w"], st.session_state["crop_h"] = w, h
                 st.rerun()
 
-            # Dimensões finais do corte (garantindo valores pares para o encoder H.264)
             final_x = corte_esq if corte_esq % 2 == 0 else corte_esq - 1
             final_y = corte_topo if corte_topo % 2 == 0 else corte_topo - 1
             final_w = max(100, orig_w - corte_esq - corte_dir)
@@ -466,9 +464,10 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
                 draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
+                # Escala ajustada para preencher perfeitamente a largura do molde rosa
                 filtro_prev = (
                     f"[1:v]scale=1080:1920[fundo];"
-                    f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=860:-2[vid];"
+                    f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2[vid];"
                     f"[fundo][vid]overlay=(W-w)/2:{pos_y_video}[base];"
                     f"[base]{draw_l1},{draw_l2}[v]"
                 )
@@ -526,7 +525,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
                         speed_cmd = ",setpts=PTS/1.03" if modo_anti_copyright else ""
-                        filtro_video = f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=860:-2{speed_cmd}[vid];"
+                        filtro_video = f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2{speed_cmd}[vid];"
 
                         tem_som = tem_audio(st.session_state["video_original"])
                         if modo_anti_copyright and tem_som:
