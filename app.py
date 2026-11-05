@@ -427,7 +427,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 with col_l1: corte_esq = st.slider("Cortar Esquerda:", 0, int(orig_w * 0.4), min(init_left, int(orig_w * 0.4)), step=2)
                 with col_l2: corte_dir = st.slider("Cortar Direita:", 0, int(orig_w * 0.4), min(init_right, int(orig_w * 0.4)), step=2)
 
-                pos_y_video = st.slider("📍 Altura do Vídeo na Moldura:", 350, 1000, 640, 10, help="Onde o vídeo começa abaixo de 'Sinopse'")
+                pos_y_video = st.slider("📍 Altura do Vídeo na Moldura:", 350, 1000, 450, 10, help="Onde o vídeo começa na moldura")
 
                 if st.button("🔄 Recalcular Corte com IA"):
                     x, y, w, h, _ = detectar_crop_inteligente(st.session_state["video_original"])
@@ -438,7 +438,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             if 'corte_topo' not in locals():
                 corte_topo, corte_base = init_top, init_bottom
                 corte_esq, corte_dir = init_left, init_right
-                pos_y_video = 640
+                pos_y_video = 450  # Posição ideal centralizada padrão na moldura
 
             final_x = corte_esq if corte_esq % 2 == 0 else corte_esq - 1
             final_y = corte_topo if corte_topo % 2 == 0 else corte_topo - 1
@@ -467,9 +467,10 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
                 draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
+                # Redimensiona o vídeo para caber perfeitamente na janela central do molde e o posiciona com precisão
                 filtro_prev = (
                     f"[1:v]scale=1080:1920[fundo];"
-                    f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2[vid];"
+                    f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=860:-2[vid];"
                     f"[fundo][vid]overlay=(W-w)/2:{pos_y_video}[base];"
                     f"[base]{draw_l1},{draw_l2}[v]"
                 )
@@ -527,7 +528,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
                         speed_cmd = ",setpts=PTS/1.03" if modo_anti_copyright else ""
-                        filtro_video = f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2{speed_cmd}[vid];"
+                        filtro_video = f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=860:-2{speed_cmd}[vid];"
 
                         tem_som = tem_audio(st.session_state["video_original"])
                         if modo_anti_copyright and tem_som:
