@@ -201,7 +201,6 @@ def resolver_url_video_real(url_alvo):
     if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com", "youtube.com", "youtu.be"]):
         return url_limpa, "Cena Viral de Dorama"
     
-    # 1. Tenta extrair primeiro usando o motor yt-dlp atualizado (suporta Kwai, TikTok, YouTube, Instagram)
     try:
         import yt_dlp
         ydl_opts = {
@@ -226,7 +225,6 @@ def resolver_url_video_real(url_alvo):
                     return primeiro['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
     except: pass
 
-    # 2. Fallback específico para TikTok via API tikwm
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -241,7 +239,6 @@ def resolver_url_video_real(url_alvo):
                     if play_url: return play_url, (titulo_extraido or "ASSISTA ATÉ AO FIM")
         except: pass
 
-    # 3. Fallback dedicado para Kwai caso o yt-dlp encontre barreiras de requisição direta
     if "kwai.com" in url_limpa:
         try:
             req_kwai = urllib.request.Request(
@@ -283,7 +280,6 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         try: os.remove(f)
         except: pass
 
-    # Tenta baixar diretamente usando o yt-dlp (gerencia formatos e união de áudio/vídeo perfeitamente)
     try:
         import yt_dlp
         ydl_opts = {
@@ -299,7 +295,6 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
             return True, caminho_saida, titulo_detectado
     except: pass
 
-    # Se falhar, tenta resolver a URL de streaming e baixar via urllib
     url_stream, titulo_detectado = resolver_url_video_real(url_alvo)
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': '*/*'}
     try:
@@ -365,7 +360,6 @@ with col_topo_2:
                         st.session_state["video_original"] = caminho_vid
                         st.session_state["texto_input_armazenado"] = tit_detectado if tit_detectado else "ASSISTA ATÉ AO FIM"
                         
-                        # IA calcula automaticamente onde cortar o fundo e as bordas
                         x, y, w, h, frame_ref = detectar_crop_inteligente(caminho_vid)
                         st.session_state["crop_x"], st.session_state["crop_y"] = x, y
                         st.session_state["crop_w"], st.session_state["crop_h"] = w, h
@@ -387,7 +381,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
     orig_w = st.session_state.get("orig_w", 1080)
     orig_h = st.session_state.get("orig_h", 1920)
 
-    # Coordenadas que a IA detectou (ou valores padrão)
     init_top = int(st.session_state.get("crop_y", 0))
     init_h = int(st.session_state.get("crop_h", orig_h))
     init_bottom = max(0, int(orig_h - (init_top + init_h)))
@@ -425,7 +418,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 largura_borda = opcoes_borda[borda_nome]
                 cor_borda = "white" if cor_hex == "black" else "black"
 
-            # AJUSTE MANUAL OPCIONAL: O script já preenche tudo sozinho pela IA
             with st.expander("✂️ Ajustar Corte Manualmente (Opcional - Script já cortou sozinho)", expanded=False):
                 st.write("A IA já calculou o melhor enquadramento. Se ainda sobrar algum pedaço indesejado, ajuste abaixo:")
                 corte_topo = st.slider("✂️ Cortar do Topo (pixels):", 0, int(orig_h * 0.7), min(init_top, int(orig_h * 0.7)), step=2)
@@ -443,13 +435,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     st.session_state["crop_w"], st.session_state["crop_h"] = w, h
                     st.rerun()
             
-            # Se o expander não for aberto, usa os valores da IA ou os ajustados
             if 'corte_topo' not in locals():
                 corte_topo, corte_base = init_top, init_bottom
                 corte_esq, corte_dir = init_left, init_right
                 pos_y_video = 640
 
-            # Dimensões finais do corte (garantindo valores pares para o encoder H.264)
             final_x = corte_esq if corte_esq % 2 == 0 else corte_esq - 1
             final_y = corte_topo if corte_topo % 2 == 0 else corte_topo - 1
             final_w = max(100, orig_w - corte_esq - corte_dir)
@@ -477,7 +467,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
                 draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
 
-                # Encaixa o vídeo cortado diretamente dentro da moldura rosa
                 filtro_prev = (
                     f"[1:v]scale=1080:1920[fundo];"
                     f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2[vid];"
@@ -499,7 +488,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     if os.path.exists(caminho_saida_prev):
                         st.image(caminho_saida_prev, caption="✨ Prévia Final: Vídeo cortado e inserido na moldura!", use_container_width=True)
                 except Exception:
-                    # Fallback caso o vídeo seja menor que 1.5s
                     comando_prev[2] = "0"
                     subprocess.run(comando_prev, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     if os.path.exists(caminho_saida_prev):
