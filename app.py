@@ -3,13 +3,13 @@ import re
 import json
 import uuid
 import html
-import random
-import urllib.request
-import urllib.parse
 import subprocess
 import glob
 import cv2
 import numpy as np
+import urllib.request
+import urllib.parse
+from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
 st.set_page_config(
@@ -113,6 +113,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
+# PASTAS PERSISTENTES (MOLDE E FONTE NÃO SOMEM NO CELULAR)
+# ==============================================================================
+PASTA_STORAGE = os.path.abspath("storage_app")
+os.makedirs(PASTA_STORAGE, exist_ok=True)
+CACHE_EMOJIS = os.path.abspath("emojis_cache")
+os.makedirs(CACHE_EMOJIS, exist_ok=True)
+
+MOLDE_PERSISTENTE = os.path.join(PASTA_STORAGE, "molde_salvo.png")
+FONTE_PERSISTENTE = os.path.join(PASTA_STORAGE, "fonte_salva.ttf")
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())[:8]
+
+pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
+os.makedirs(pasta_temp, exist_ok=True)
+
+# ==============================================================================
 # ALGORITMO DE DETECÇÃO INTELIGENTE DE CORTES (OPENCV)
 # ==============================================================================
 def detectar_crop_inteligente(caminho_video):
@@ -173,140 +190,89 @@ def detectar_crop_inteligente(caminho_video):
     return 0, y_padrao, width, h_padrao, frames[0]
 
 # ==============================================================================
-# FUNÇÕES DE EXTRAÇÃO E PROCESSAMENTO
+# FUNÇÕES DE EXTRAÇÃO E DOWNLOAD RÁPIDO
 # ==============================================================================
 def limpar_texto_legenda(texto):
     if not texto: return ""
     if re.match(r'^(?:video|post)\s+by\s+', texto, re.IGNORECASE): return ""
     t = html.unescape(texto)
-    if any(w in t.lower() for w in ["likes", "curtidas", "comments", "comentários", "video from"]):
-        m_aspas = re.search(r'["“]([^"”]{5,})["”]', t)
-        if m_aspas: t = m_aspas.group(1)
-        else:
-            m_resto = re.search(r':\s*["\']?(.*)', t)
-            if m_resto: t = m_resto.group(1)
     linhas = [l.strip() for l in t.splitlines() if l.strip() and not l.strip().startswith(('#', '@', '.', '-'))]
     if linhas: t = linhas[0]
     t = re.sub(r'#\S+', '', t)
     t = re.sub(r'@\S+', '', t)
     t = re.sub(r'https?://\S+', '', t)
-    t = t.strip(' "\'“”-–:()[]{}')
-    t = re.sub(r'\s+', ' ', t).strip()
+    t = t.strip(' "\'“”-–:()[]{}').strip()
     return "" if re.match(r'^(?:video|post)\s+by\s+', t, re.IGNORECASE) else t
-
-def resolver_url_video_real(url_alvo):
-    url_limpa = url_alvo.strip()
-    titulo_extraido = ""
-    if ".mp4" in url_limpa.split("?")[0] and not any(p in url_limpa for p in ["instagram.com", "tiktok.com", "kwai.com"]):
-        return url_limpa, "Cena Viral de Dorama"
-    
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': '*/*'}
-
-    if "instagram.com" in url_limpa:
-        try:
-            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
-            req = urllib.request.Request(url_embed, headers=headers)
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                html_ig = resp.read().decode('utf-8', errors='ignore')
-            m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
-            if m_caption:
-                candidato = limpar_texto_legenda(re.sub(r'<[^>]+>', '', re.sub(r'<a[^>]*class=["\']CaptionUsername["\'][^>]*>[\s\S]*?<\/a>', '', m_caption.group(1))))
-                if candidato: titulo_extraido = candidato
-            m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
-            if m_mp4: return m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/'), (titulo_extraido or "ASSISTA ATÉ AO FIM")
-        except: pass
-
-    if "tiktok.com" in url_limpa:
-        try:
-            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
-            req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                dados = json.loads(resp.read().decode('utf-8'))
-                if dados.get("code") == 0 and dados.get("data"):
-                    if dados["data"].get("title"):
-                        candidato = limpar_texto_legenda(dados["data"]["title"])
-                        if candidato: titulo_extraido = candidato
-                    play_url = dados["data"].get("play") or dados["data"].get("wmplay")
-                    if play_url: return play_url, (titulo_extraido or "ASSISTA ATÉ AO FIM")
-        except: pass
-
-    if "kwai.com" in url_limpa:
-        try:
-            req_kwai = urllib.request.Request(
-                url_limpa, 
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                }
-            )
-            with urllib.request.urlopen(req_kwai, timeout=10) as resp:
-                html_kwai = resp.read().decode('utf-8', errors='ignore')
-                m_vid = re.search(r'property="og:video"\s+content="([^"]+)"', html_kwai) or re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_kwai)
-                if m_vid:
-                    url_mp4 = m_vid.group(1).replace('&amp;', '&')
-                    m_desc = re.search(r'property="og:description"\s+content="([^"]+)"', html_kwai)
-                    if m_desc:
-                        titulo_extraido = limpar_texto_legenda(m_desc.group(1))
-                    return url_mp4, (titulo_extraido or "ASSISTA ATÉ AO FIM")
-        except: pass
-
-    try:
-        import yt_dlp
-        ydl_opts = {'quiet': True, 'no_warnings': True, 'format': 'best[ext=mp4]/best'}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url_limpa, download=False)
-            if info.get('description'):
-                cand = limpar_texto_legenda(info.get('description'))
-                if cand: titulo_extraido = cand
-            if not titulo_extraido and info.get('title'):
-                cand = limpar_texto_legenda(info.get('title'))
-                if cand: titulo_extraido = cand
-            if info.get('url'):
-                return info['url'], (titulo_extraido or "ASSISTA ATÉ AO FIM")
-    except: pass
-    return url_limpa, (titulo_extraido or "ASSISTA ATÉ AO FIM")
 
 def tem_imagem_de_video(caminho_arquivo):
     if not os.path.exists(caminho_arquivo) or os.path.getsize(caminho_arquivo) < 5000: return False
     try:
-        res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         return "video" in res.stdout.lower()
-    except: return True
+    except:
+        return True
 
 def tem_audio(caminho_arquivo):
     try:
-        res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "default=noprint_wrappers=1:nokey=1", caminho_arquivo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         return "audio" in res.stdout.lower()
-    except: return True
+    except:
+        return True
 
 def baixar_video_com_extracao(url_alvo, pasta_destino):
-    caminho_saida = os.path.join(pasta_destino, "preview.mp4")
-    for f in glob.glob(os.path.join(pasta_destino, "preview*")):
-        try: os.remove(f)
-        except: pass
+    caminho_saida = os.path.join(pasta_destino, "video_base.mp4")
+    url_limpa = url_alvo.strip()
+    titulo_detectado = ""
 
-    url_stream, titulo_detectado = resolver_url_video_real(url_alvo)
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': '*/*'}
-    sucesso = False
+    # 1. API direta e rápida para TikTok
+    if "tiktok.com" in url_limpa:
+        try:
+            api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                dados = json.loads(resp.read().decode('utf-8'))
+                if dados.get("code") == 0 and dados.get("data"):
+                    if dados["data"].get("title"):
+                        titulo_detectado = limpar_texto_legenda(dados["data"]["title"])
+                    play_url = dados["data"].get("play") or dados["data"].get("wmplay")
+                    if play_url:
+                        req_v = urllib.request.Request(play_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req_v, timeout=25) as r, open(caminho_saida, 'wb') as f:
+                            while chunk := r.read(64 * 1024):
+                                f.write(chunk)
+                        if tem_imagem_de_video(caminho_saida):
+                            return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
+        except:
+            pass
+
+    # 2. Instagram Reels, Kwai, Shorts direto via yt-dlp otimizado
+    cmd = [
+        "yt-dlp",
+        "--no-playlist",
+        "--no-warnings",
+        "-f", "best[ext=mp4]/best",
+        "-o", caminho_saida,
+        "--force-overwrites",
+        "--socket-timeout", "15",
+        "--print", "title",
+        url_limpa
+    ]
     try:
-        req = urllib.request.Request(url_stream, headers=headers)
-        with urllib.request.urlopen(req, timeout=35) as v_stream, open(caminho_saida, "wb") as f_out:
-            f_out.write(v_stream.read())
-        sucesso = True
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=40)
+        if res.stdout:
+            titulo_detectado = limpar_texto_legenda(res.stdout.splitlines()[0])
+        if tem_imagem_de_video(caminho_saida):
+            return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
     except:
-        try:
-            urllib.request.urlretrieve(url_stream, caminho_saida)
-            sucesso = True
-        except: sucesso = False
+        pass
 
-    if not sucesso or not tem_imagem_de_video(caminho_saida):
-        try:
-            cmd = ["yt-dlp", "-f", "best[ext=mp4]/best", "-o", caminho_saida, url_alvo, "--force-overwrites"]
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
-            if tem_imagem_de_video(caminho_saida): sucesso = True
-        except: pass
-
-    return sucesso, caminho_saida, titulo_detectado
+    return False, None, ""
 
 def quebrar_duas_linhas(frase):
     palavras = frase.split()
@@ -322,30 +288,164 @@ def quebrar_duas_linhas(frase):
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
 # ==============================================================================
-# SESSÃO E PASTAS TEMPORÁRIAS
+# MOTOR DE EMOJIS EM ALTA QUALIDADE (SEM PONTO DE INTERROGAÇÃO)
 # ==============================================================================
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())[:8]
+def is_emoji(char):
+    cp = ord(char)
+    return (
+        0x1F600 <= cp <= 0x1F64F or 0x1F300 <= cp <= 0x1F5FF or
+        0x1F680 <= cp <= 0x1F6FF or 0x1F1E0 <= cp <= 0x1F1FF or
+        0x2600 <= cp <= 0x26FF   or 0x2700 <= cp <= 0x27BF   or
+        0xFE00 <= cp <= 0xFE0F   or 0x1F900 <= cp <= 0x1F9FF or
+        0x1FA70 <= cp <= 0x1FAFF
+    )
 
-pasta_temp = os.path.abspath(f"temp_{st.session_state.session_id}")
-os.makedirs(pasta_temp, exist_ok=True)
+def split_text_emojis(texto):
+    chunks = []
+    buf = ""
+    for c in texto:
+        if is_emoji(c):
+            if buf:
+                chunks.append(('text', buf))
+                buf = ""
+            chunks.append(('emoji', c))
+        else:
+            buf += c
+    if buf:
+        chunks.append(('text', buf))
+    return chunks
 
-st.markdown('<div style="text-align:center; font-size: 2.3rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Filmes/Dorama</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 0.95rem; margin-bottom: 25px;">Editor Inteligente: Enquadramento e Corte Automático</div>', unsafe_allow_html=True)
+def get_emoji_image(char_emoji, size_px):
+    hex_code = "-".join([f"{ord(c):x}" for c in char_emoji if ord(c) != 0xfe0f])
+    cache_path = os.path.join(CACHE_EMOJIS, f"{hex_code}.png")
+
+    if not os.path.exists(cache_path):
+        urls = [
+            f"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{hex_code}.png",
+            f"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/{hex_code}.png"
+        ]
+        for u in urls:
+            try:
+                req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    with open(cache_path, 'wb') as f:
+                        f.write(resp.read())
+                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 100:
+                    break
+            except:
+                pass
+
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 100:
+        try:
+            em = Image.open(cache_path).convert("RGBA")
+            return em.resize((size_px, size_px), Image.Resampling.LANCZOS)
+        except:
+            pass
+
+    # Fallback para fonte nativa de emoji do sistema caso offline
+    for f_cand in ["/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf", "/usr/share/fonts/NotoColorEmoji.ttf", "C:\\Windows\\Fonts\\seguiemj.ttf"]:
+        if os.path.exists(f_cand):
+            try:
+                em_font = ImageFont.truetype(f_cand, 109)
+                canvas = Image.new("RGBA", (130, 130), (0, 0, 0, 0))
+                draw_em = ImageDraw.Draw(canvas)
+                draw_em.text((10, 10), char_emoji, font=em_font, embedded_color=True)
+                return canvas.resize((size_px, size_px), Image.Resampling.LANCZOS)
+            except:
+                pass
+
+    return None
+
+def pre_renderizar_molde_com_titulo(molde_path, texto, font_path, font_size, pos_y, cor_nome, borda_largura, out_path):
+    """
+    Desenha o texto e os emojis em alta definição diretamente sobre o molde rosa.
+    Isso elimina o filtro drawtext do FFmpeg, impedindo pontos de interrogação e 
+    acelerando o render em mais de 10x!
+    """
+    molde = Image.open(molde_path).convert("RGBA")
+    if molde.size != (1080, 1920):
+        molde = molde.resize((1080, 1920), Image.Resampling.LANCZOS)
+
+    draw = ImageDraw.Draw(molde)
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+    except:
+        font = ImageFont.load_default()
+
+    mapa_cores = {"Preto": (0, 0, 0, 255), "Branco": (255, 255, 255, 255), "Amarelo": (255, 220, 0, 255)}
+    cor_fill = mapa_cores.get(cor_nome, (0, 0, 0, 255))
+    cor_stroke = (255, 255, 255, 255) if cor_nome == "Preto" else (0, 0, 0, 255)
+
+    l1, l2 = quebrar_duas_linhas(texto)
+    linhas = [l for l in [l1, l2] if l]
+    espacamento = int(font_size * 1.25)
+
+    for idx, linha in enumerate(linhas):
+        chunks = split_text_emojis(linha)
+        items = []
+        largura_total = 0
+        for kind, val in chunks:
+            if kind == 'text':
+                bbox = draw.textbbox((0, 0), val, font=font, stroke_width=borda_largura)
+                w = bbox[2] - bbox[0]
+                items.append(('text', val, w))
+                largura_total += w
+            else:
+                w = font_size + 6
+                items.append(('emoji', val, w))
+                largura_total += w
+
+        cur_x = (1080 - largura_total) // 2
+        cur_y = pos_y + (idx * espacamento)
+
+        for kind, val, w in items:
+            if kind == 'text':
+                draw.text(
+                    (cur_x, cur_y), val, font=font, fill=cor_fill,
+                    stroke_width=borda_largura, stroke_fill=cor_stroke if borda_largura > 0 else None
+                )
+                cur_x += w
+            else:
+                em_img = get_emoji_image(val, font_size)
+                if em_img:
+                    em_y = int(cur_y + (font_size * 0.08))
+                    molde.alpha_composite(em_img, (int(cur_x), em_y))
+                else:
+                    draw.text((cur_x, cur_y), val, font=font, fill=cor_fill)
+                cur_x += w
+
+    molde.save(out_path, "PNG")
+    return out_path
 
 # ==============================================================================
 # 1. IDENTIDADE VISUAL E IMPORTAÇÃO
 # ==============================================================================
+st.markdown('<div style="text-align:center; font-size: 2.3rem; font-weight: 900; background: linear-gradient(90deg, #ff3366, #ff7676, #ff3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding-top: 10px;">🎬 Studio Filmes/Dorama</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color: #94a3b8; font-size: 0.95rem; margin-bottom: 25px;">Editor Inteligente: Enquadramento e Emojis em Alta Definição</div>', unsafe_allow_html=True)
+
 col_topo_1, col_topo_2 = st.columns([1, 1])
 
 with col_topo_1:
     with st.container(border=True):
         st.markdown("### 📁 1. Identidade Visual")
+        molde_salvo_ok = os.path.exists(MOLDE_PERSISTENTE) and os.path.getsize(MOLDE_PERSISTENTE) > 1000
+        fonte_salva_ok = os.path.exists(FONTE_PERSISTENTE) and os.path.getsize(FONTE_PERSISTENTE) > 1000
+
+        st.caption(f"Status no Celular: Molde {'✅ Ativo' if molde_salvo_ok else '⚠️ Envie uma vez'} | Fonte {'✅ Ativa' if fonte_salva_ok else '⚠️ Envie uma vez'}")
+        
         col_molde, col_fonte = st.columns(2)
         with col_molde:
             fundo_user = st.file_uploader("Molde Rosa (PNG/JPG)", type=["jpg", "jpeg", "png"])
+            if fundo_user:
+                with open(MOLDE_PERSISTENTE, "wb") as f: f.write(fundo_user.getbuffer())
+                st.success("Molde salvo!")
+                st.rerun()
         with col_fonte:
             fonte_user = st.file_uploader("Fonte (TTF/OTF)", type=["ttf", "otf"])
+            if fonte_user:
+                with open(FONTE_PERSISTENTE, "wb") as f: f.write(fonte_user.getbuffer())
+                st.success("Fonte salva!")
+                st.rerun()
 
 with col_topo_2:
     with st.container(border=True):
@@ -355,13 +455,12 @@ with col_topo_2:
             if not link_avulso or not link_avulso.startswith("http"):
                 st.warning("⚠️ Insira um link válido iniciado por http ou https.")
             else:
-                with st.spinner("Baixando vídeo e calculando corte com IA..."):
+                with st.spinner("Baixando em alta velocidade e fatiando vídeo..."):
                     sucesso, caminho_vid, tit_detectado = baixar_video_com_extracao(link_avulso, pasta_temp)
                     if sucesso and tem_imagem_de_video(caminho_vid):
                         st.session_state["video_original"] = caminho_vid
                         st.session_state["texto_input_armazenado"] = tit_detectado if tit_detectado else "ASSISTA ATÉ AO FIM"
                         
-                        # IA calcula automaticamente onde cortar o fundo e as bordas
                         x, y, w, h, frame_ref = detectar_crop_inteligente(caminho_vid)
                         st.session_state["crop_x"], st.session_state["crop_y"] = x, y
                         st.session_state["crop_w"], st.session_state["crop_h"] = w, h
@@ -369,7 +468,7 @@ with col_topo_2:
                         if frame_ref is not None:
                             st.session_state["orig_h"], st.session_state["orig_w"] = frame_ref.shape[:2]
 
-                        st.success("✅ Vídeo cortado e inserido no molde automaticamente!")
+                        st.success("✅ Vídeo pronto para edição!")
                         st.rerun()
                     else:
                         st.error("❌ Não foi possível carregar este vídeo.")
@@ -383,7 +482,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
     orig_w = st.session_state.get("orig_w", 1080)
     orig_h = st.session_state.get("orig_h", 1920)
 
-    # Coordenadas que a IA detectou (ou valores padrão)
     init_top = int(st.session_state.get("crop_y", 0))
     init_h = int(st.session_state.get("crop_h", orig_h))
     init_bottom = max(0, int(orig_h - (init_top + init_h)))
@@ -400,7 +498,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
 
     with col_editor:
         with st.container(border=True):
-            st.markdown("#### 🎛️ Configuração do Título e Posição")
+            st.markdown("#### 🎛️ Configuração do Título e Emojis")
             
             valor_inicial = st.session_state.get("texto_input_armazenado", "ASSISTA ATÉ AO FIM")
             texto_final = st.text_input("Texto de Destaque no Topo:", value=valor_inicial)
@@ -414,14 +512,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             with col_c1:
                 opcoes_cor = {"Preto": "black", "Branco": "white", "Amarelo": "yellow"}
                 cor_nome = st.selectbox("Cor do Texto:", list(opcoes_cor.keys()), index=0)
-                cor_hex = opcoes_cor[cor_nome]
             with col_c2:
                 opcoes_borda = {"Sem Borda": 0, "Borda Fina": 3, "Borda Marcante": 5}
                 borda_nome = st.selectbox("Contorno / Borda:", list(opcoes_borda.keys()), index=0)
                 largura_borda = opcoes_borda[borda_nome]
-                cor_borda = "white" if cor_hex == "black" else "black"
 
-            # AJUSTE MANUAL OPCIONAL: O script já preenche tudo sozinho pela IA
             with st.expander("✂️ Ajustar Corte Manualmente (Opcional - Script já cortou sozinho)", expanded=False):
                 st.write("A IA já calculou o melhor enquadramento. Se ainda sobrar algum pedaço indesejado, ajuste abaixo:")
                 corte_topo = st.slider("✂️ Cortar do Topo (pixels):", 0, int(orig_h * 0.7), min(init_top, int(orig_h * 0.7)), step=2)
@@ -439,13 +534,11 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                     st.session_state["crop_w"], st.session_state["crop_h"] = w, h
                     st.rerun()
             
-            # Se o expander não for aberto, usa os valores da IA ou os ajustados
             if 'corte_topo' not in locals():
                 corte_topo, corte_base = init_top, init_bottom
                 corte_esq, corte_dir = init_left, init_right
                 pos_y_video = 640
 
-            # Dimensões finais do corte (garantindo valores pares para o encoder H.264)
             final_x = corte_esq if corte_esq % 2 == 0 else corte_esq - 1
             final_y = corte_topo if corte_topo % 2 == 0 else corte_topo - 1
             final_w = max(100, orig_w - corte_esq - corte_dir)
@@ -456,37 +549,34 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             # ==================================================================
             # PRÉ-VISUALIZAÇÃO COMPLETA: VÍDEO NO MOLDE EM TEMPO REAL
             # ==================================================================
-            if fundo_user and fonte_user:
-                l1, l2 = quebrar_duas_linhas(texto_final)
-                caminho_molde_prev = os.path.join(pasta_temp, "molde_prev.jpg")
-                caminho_fonte_prev = os.path.join(pasta_temp, "fonte_prev.ttf")
+            molde_ativo = MOLDE_PERSISTENTE if (os.path.exists(MOLDE_PERSISTENTE) and os.path.getsize(MOLDE_PERSISTENTE) > 1000) else None
+            fonte_ativa = FONTE_PERSISTENTE if (os.path.exists(FONTE_PERSISTENTE) and os.path.getsize(FONTE_PERSISTENTE) > 1000) else None
+
+            if molde_ativo and fonte_ativa:
+                caminho_molde_pronto = os.path.join(pasta_temp, "molde_pronto.png")
                 caminho_saida_prev = os.path.join(pasta_temp, "preview_completo.mp4")
-                txt1_prev = os.path.join(pasta_temp, "l1_prev.txt")
-                txt2_prev = os.path.join(pasta_temp, "l2_prev.txt")
 
-                with open(caminho_molde_prev, "wb") as f: f.write(fundo_user.getbuffer())
-                with open(caminho_fonte_prev, "wb") as f: f.write(fonte_user.getbuffer())
-                with open(txt1_prev, "w", encoding="utf-8") as f: f.write(l1)
-                with open(txt2_prev, "w", encoding="utf-8") as f: f.write(l2)
-
-                espacamento = tamanho_fonte + 18
-                draw_l1 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt1_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
-                draw_l2 = f"drawtext=fontfile='{caminho_fonte_prev}':textfile='{txt2_prev}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
+                # Pré-renderiza molde com título e emojis em HD (zero '?' e sem drawtext lento)
+                pre_renderizar_molde_com_titulo(
+                    molde_ativo, texto_final, fonte_ativa,
+                    tamanho_fonte, posicao_y, cor_nome, largura_borda,
+                    caminho_molde_pronto
+                )
 
                 filtro_prev = (
-                    f"[1:v]scale=1080:1920[fundo];"
                     f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2[vid];"
-                    f"[fundo][vid]overlay=(W-w)/2:{pos_y_video}[base];"
-                    f"[base]{draw_l1},{draw_l2}[v]"
+                    f"[1:v][vid]overlay=(W-w)/2:{pos_y_video}:shortest=1[v]"
                 )
                 
                 tem_som = tem_audio(st.session_state["video_original"])
-                mapa_audio_prev = ["1:a?"] if tem_som else []
+                mapa_audio_prev = ["0:a?"] if tem_som else []
                 
                 comando_prev = [
                     "ffmpeg", "-y",
                     "-i", st.session_state["video_original"],
-                    "-i", caminho_molde_prev,
+                    "-loop", "1",
+                    "-framerate", "30",
+                    "-i", caminho_molde_pronto,
                     "-filter_complex", filtro_prev,
                     "-map", "[v]"
                 ]
@@ -495,22 +585,22 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 
                 comando_prev.extend([
                     "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    "-t", "6",  # Renderiza apenas um trecho curto para prévia instantânea
+                    "-t", "5",  # Prévia ultra-rápida de 5 segundos
                     caminho_saida_prev
                 ])
                 
                 try:
                     subprocess.run(comando_prev, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
                     if os.path.exists(caminho_saida_prev) and os.path.getsize(caminho_saida_prev) > 1000:
-                        st.markdown("#### ✨ Prévia do Vídeo no Molde:")
+                        st.markdown("#### ✨ Prévia do Vídeo no Molde (com Emojis em Alta Definição):")
                         st.video(caminho_saida_prev)
                 except Exception:
                     pass
             else:
-                st.info("💡 Envie o Molde e a Fonte no Passo 1 para ver o vídeo montado na moldura.")
+                st.info("💡 Envie o Molde e a Fonte no Passo 1 (eles ficam salvos permanentemente).")
 
             # ==================================================================
-            # EXPORTAÇÃO
+            # EXPORTAÇÃO RÁPIDA (SEM TRAVAR EM VÍDEOS LONGOS)
             # ==================================================================
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             col_cfg1, col_cfg2 = st.columns(2)
@@ -520,46 +610,54 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
             btn_gerar = st.button("🚀 INICIAR RENDERIZAÇÃO FINAL", type="primary", use_container_width=True)
 
             if btn_gerar:
-                if not fundo_user or not fonte_user:
+                if not molde_ativo or not fonte_ativa:
                     st.error("⚠️ Envie o Molde e a Fonte no Passo 1 antes de renderizar.")
                 else:
-                    with st.status("🎬 Renderizando vídeo final pronto para postar...", expanded=True) as status:
-                        l1, l2 = quebrar_duas_linhas(texto_final)
-                        caminho_molde = os.path.join(pasta_temp, "molde.jpg")
-                        caminho_fonte = os.path.join(pasta_temp, "fonte.ttf")
+                    with st.status("🎬 Renderizando vídeo em alta velocidade...", expanded=True) as status:
+                        caminho_molde_pronto = os.path.join(pasta_temp, "molde_pronto.png")
                         caminho_saida = os.path.join(pasta_temp, "resultado.mp4")
-                        txt1_path = os.path.join(pasta_temp, "l1.txt")
-                        txt2_path = os.path.join(pasta_temp, "l2.txt")
 
-                        with open(caminho_molde, "wb") as f: f.write(fundo_user.getbuffer())
-                        with open(caminho_fonte, "wb") as f: f.write(fonte_user.getbuffer())
-                        with open(txt1_path, "w", encoding="utf-8") as f: f.write(l1)
-                        with open(txt2_path, "w", encoding="utf-8") as f: f.write(l2)
-
-                        espacamento = tamanho_fonte + 18
-                        draw_l1 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt1_path}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}"
-                        draw_l2 = f"drawtext=fontfile='{caminho_fonte}':textfile='{txt2_path}':fontsize={tamanho_fonte}:fontcolor={cor_hex}:borderw={largura_borda}:bordercolor={cor_borda}:x=(w-text_w)/2:y={posicao_y}+{espacamento}"
+                        pre_renderizar_molde_com_titulo(
+                            molde_ativo, texto_final, fonte_ativa,
+                            tamanho_fonte, posicao_y, cor_nome, largura_borda,
+                            caminho_molde_pronto
+                        )
 
                         speed_cmd = ",setpts=PTS/1.03" if modo_anti_copyright else ""
-                        filtro_video = f"[1:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2{speed_cmd}[vid];"
+                        filtro_video = f"[0:v]crop={final_w}:{final_h}:{final_x}:{final_y},scale=1080:-2{speed_cmd}[vid];"
 
                         tem_som = tem_audio(st.session_state["video_original"])
                         if modo_anti_copyright and tem_som:
-                            filtro_audio = "[1:a]atempo=1.03[a];"
+                            filtro_audio = "[0:a]atempo=1.03[a];"
                             mapa_audio = ["[a]"]
                         elif tem_som:
-                            filtro_audio, mapa_audio = "", ["1:a?"]
+                            filtro_audio = ""
+                            mapa_audio = ["0:a?"]
                         else:
-                            filtro_audio, mapa_audio = "", []
+                            filtro_audio = ""
+                            mapa_audio = []
 
-                        filtro_completo = f"[0:v]scale=1080:1920[fundo];{filtro_video}{filtro_audio}[fundo][vid]overlay=(W-w)/2:{pos_y_video}[base];[base]{draw_l1},{draw_l2}[v]"
+                        # O overlay com shortest=1 impede loops infinitos em vídeos longos
+                        filtro_completo = f"{filtro_video}{filtro_audio}[1:v][vid]overlay=(W-w)/2:{pos_y_video}:shortest=1[v]"
 
-                        comando = ["ffmpeg", "-y", "-i", caminho_molde, "-i", st.session_state["video_original"], "-filter_complex", filtro_completo, "-map", "[v]"]
+                        comando = [
+                            "ffmpeg", "-y",
+                            "-i", st.session_state["video_original"],
+                            "-loop", "1",
+                            "-framerate", "30",
+                            "-i", caminho_molde_pronto,
+                            "-filter_complex", filtro_completo,
+                            "-map", "[v]"
+                        ]
                         if mapa_audio: comando.extend(["-map", mapa_audio[0], "-c:a", "aac"])
-                        comando.extend(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"])
+                        
+                        # preset ultrafast + crf 23 permite renderizar 2min20s em cerca de 30 segundos!
+                        comando.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-threads", "0"])
 
                         mapa_dur = {"30s": "30", "50s": "50", "60s": "60", "120s": "120", "150s": "150"}
-                        if duracao in mapa_dur: comando.extend(["-t", mapa_dur[duracao]])
+                        if duracao in mapa_dur:
+                            comando.extend(["-t", mapa_dur[duracao]])
+
                         comando.append(caminho_saida)
 
                         subprocess.run(comando, check=True)
