@@ -2,3 +2,5 @@ streamlit
 yt-dlp
 opencv-python-headless
 numpy
+Pillow
+pilmoji
