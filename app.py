@@ -113,7 +113,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# PASTAS PERSISTENTES (MOLDE E FONTE NÃO SOMEM NO CELULAR)
+# PASTAS PERSISTENTES E ARQUIVOS FIXOS
 # ==============================================================================
 PASTA_STORAGE = os.path.abspath("storage_app")
 os.makedirs(PASTA_STORAGE, exist_ok=True)
@@ -201,8 +201,7 @@ def limpar_texto_legenda(texto):
     t = re.sub(r'#\S+', '', t)
     t = re.sub(r'@\S+', '', t)
     t = re.sub(r'https?://\S+', '', t)
-    t = t.strip(' "\'“”-–:()[]{}').strip()
-    return "" if re.match(r'^(?:video|post)\s+by\s+', t, re.IGNORECASE) else t
+    return t.strip(' "\'“”-–:()[]{}').strip()
 
 def tem_imagem_de_video(caminho_arquivo):
     if not os.path.exists(caminho_arquivo) or os.path.getsize(caminho_arquivo) < 5000: return False
@@ -230,7 +229,35 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
     url_limpa = url_alvo.strip()
     titulo_detectado = ""
 
-    # 1. API direta e rápida para TikTok
+    # 1. Instagram: Tenta embed direto em alta velocidade (< 2s)
+    if "instagram.com" in url_limpa:
+        try:
+            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
+            req = urllib.request.Request(
+                url_embed,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                html_ig = resp.read().decode('utf-8', errors='ignore')
+                m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
+                if m_caption:
+                    texto_puro = re.sub(r'<[^>]+>', '', m_caption.group(1))
+                    titulo_detectado = limpar_texto_legenda(texto_puro)
+                
+                m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
+                        re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
+                if m_mp4:
+                    stream_url = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
+                    req_v = urllib.request.Request(stream_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req_v, timeout=20) as r, open(caminho_saida, 'wb') as f:
+                        while chunk := r.read(64 * 1024):
+                            f.write(chunk)
+                    if tem_imagem_de_video(caminho_saida):
+                        return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
+        except:
+            pass
+
+    # 2. TikTok: API direta sem restrição
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -251,7 +278,7 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         except:
             pass
 
-    # 2. Instagram Reels, Kwai, Shorts direto via yt-dlp otimizado
+    # 3. Fallback direto via yt-dlp sem flags que bloqueiam download
     cmd = [
         "yt-dlp",
         "--no-playlist",
@@ -260,13 +287,10 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         "-o", caminho_saida,
         "--force-overwrites",
         "--socket-timeout", "15",
-        "--print", "title",
         url_limpa
     ]
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=40)
-        if res.stdout:
-            titulo_detectado = limpar_texto_legenda(res.stdout.splitlines()[0])
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
         if tem_imagem_de_video(caminho_saida):
             return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
     except:
@@ -288,7 +312,7 @@ def quebrar_duas_linhas(frase):
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
 # ==============================================================================
-# MOTOR DE EMOJIS EM ALTA QUALIDADE (SEM PONTO DE INTERROGAÇÃO)
+# MOTOR DE EMOJIS EM ALTA QUALIDADE (TWEMOJI OFICIAL)
 # ==============================================================================
 def is_emoji(char):
     cp = ord(char)
@@ -342,26 +366,9 @@ def get_emoji_image(char_emoji, size_px):
         except:
             pass
 
-    # Fallback para fonte nativa de emoji do sistema caso offline
-    for f_cand in ["/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf", "/usr/share/fonts/NotoColorEmoji.ttf", "C:\\Windows\\Fonts\\seguiemj.ttf"]:
-        if os.path.exists(f_cand):
-            try:
-                em_font = ImageFont.truetype(f_cand, 109)
-                canvas = Image.new("RGBA", (130, 130), (0, 0, 0, 0))
-                draw_em = ImageDraw.Draw(canvas)
-                draw_em.text((10, 10), char_emoji, font=em_font, embedded_color=True)
-                return canvas.resize((size_px, size_px), Image.Resampling.LANCZOS)
-            except:
-                pass
-
     return None
 
 def pre_renderizar_molde_com_titulo(molde_path, texto, font_path, font_size, pos_y, cor_nome, borda_largura, out_path):
-    """
-    Desenha o texto e os emojis em alta definição diretamente sobre o molde rosa.
-    Isso elimina o filtro drawtext do FFmpeg, impedindo pontos de interrogação e 
-    acelerando o render em mais de 10x!
-    """
     molde = Image.open(molde_path).convert("RGBA")
     if molde.size != (1080, 1920):
         molde = molde.resize((1080, 1920), Image.Resampling.LANCZOS)
@@ -435,17 +442,21 @@ with col_topo_1:
         
         col_molde, col_fonte = st.columns(2)
         with col_molde:
-            fundo_user = st.file_uploader("Molde Rosa (PNG/JPG)", type=["jpg", "jpeg", "png"])
-            if fundo_user:
-                with open(MOLDE_PERSISTENTE, "wb") as f: f.write(fundo_user.getbuffer())
-                st.success("Molde salvo!")
-                st.rerun()
+            fundo_user = st.file_uploader("Molde Rosa (PNG/JPG)", type=["jpg", "jpeg", "png"], key="upload_molde")
+            if fundo_user is not None:
+                conteudo_m = fundo_user.getvalue()
+                if not os.path.exists(MOLDE_PERSISTENTE) or open(MOLDE_PERSISTENTE, "rb").read() != conteudo_m:
+                    with open(MOLDE_PERSISTENTE, "wb") as f:
+                        f.write(conteudo_m)
+                    st.toast("✅ Molde gravado com sucesso!")
         with col_fonte:
-            fonte_user = st.file_uploader("Fonte (TTF/OTF)", type=["ttf", "otf"])
-            if fonte_user:
-                with open(FONTE_PERSISTENTE, "wb") as f: f.write(fonte_user.getbuffer())
-                st.success("Fonte salva!")
-                st.rerun()
+            fonte_user = st.file_uploader("Fonte (TTF/OTF)", type=["ttf", "otf"], key="upload_fonte")
+            if fonte_user is not None:
+                conteudo_f = fonte_user.getvalue()
+                if not os.path.exists(FONTE_PERSISTENTE) or open(FONTE_PERSISTENTE, "rb").read() != conteudo_f:
+                    with open(FONTE_PERSISTENTE, "wb") as f:
+                        f.write(conteudo_f)
+                    st.toast("✅ Fonte gravada com sucesso!")
 
 with col_topo_2:
     with st.container(border=True):
@@ -455,7 +466,7 @@ with col_topo_2:
             if not link_avulso or not link_avulso.startswith("http"):
                 st.warning("⚠️ Insira um link válido iniciado por http ou https.")
             else:
-                with st.spinner("Baixando em alta velocidade e fatiando vídeo..."):
+                with st.spinner("Baixando em alta velocidade e calculando corte com IA..."):
                     sucesso, caminho_vid, tit_detectado = baixar_video_com_extracao(link_avulso, pasta_temp)
                     if sucesso and tem_imagem_de_video(caminho_vid):
                         st.session_state["video_original"] = caminho_vid
@@ -471,7 +482,7 @@ with col_topo_2:
                         st.success("✅ Vídeo pronto para edição!")
                         st.rerun()
                     else:
-                        st.error("❌ Não foi possível carregar este vídeo.")
+                        st.error("❌ Não foi possível carregar este vídeo. Verifique se o link é público.")
 
 st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
@@ -556,7 +567,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 caminho_molde_pronto = os.path.join(pasta_temp, "molde_pronto.png")
                 caminho_saida_prev = os.path.join(pasta_temp, "preview_completo.mp4")
 
-                # Pré-renderiza molde com título e emojis em HD (zero '?' e sem drawtext lento)
                 pre_renderizar_molde_com_titulo(
                     molde_ativo, texto_final, fonte_ativa,
                     tamanho_fonte, posicao_y, cor_nome, largura_borda,
@@ -585,7 +595,7 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                 
                 comando_prev.extend([
                     "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    "-t", "5",  # Prévia ultra-rápida de 5 segundos
+                    "-t", "5",
                     caminho_saida_prev
                 ])
                 
@@ -637,7 +647,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                             filtro_audio = ""
                             mapa_audio = []
 
-                        # O overlay com shortest=1 impede loops infinitos em vídeos longos
                         filtro_completo = f"{filtro_video}{filtro_audio}[1:v][vid]overlay=(W-w)/2:{pos_y_video}:shortest=1[v]"
 
                         comando = [
@@ -651,7 +660,6 @@ if "video_original" in st.session_state and os.path.exists(st.session_state["vid
                         ]
                         if mapa_audio: comando.extend(["-map", mapa_audio[0], "-c:a", "aac"])
                         
-                        # preset ultrafast + crf 23 permite renderizar 2min20s em cerca de 30 segundos!
                         comando.extend(["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-threads", "0"])
 
                         mapa_dur = {"30s": "30", "50s": "50", "60s": "60", "120s": "120", "150s": "150"}
