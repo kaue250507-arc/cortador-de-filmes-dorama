@@ -190,7 +190,7 @@ def detectar_crop_inteligente(caminho_video):
     return 0, y_padrao, width, h_padrao, frames[0]
 
 # ==============================================================================
-# FUNÇÕES DE EXTRAÇÃO E DOWNLOAD RÁPIDO
+# FUNÇÕES DE EXTRAÇÃO E DOWNLOAD RÁPIDO (COM SUPORTE A KWAI, TIKTOK E INSTA)
 # ==============================================================================
 def limpar_texto_legenda(texto):
     if not texto: return ""
@@ -229,35 +229,48 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
     url_limpa = url_alvo.strip()
     titulo_detectado = ""
 
-    # 1. Instagram: Tenta embed direto em alta velocidade (< 2s)
-    if "instagram.com" in url_limpa:
+    headers_padrao = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    }
+
+    # 1. KWAI (k.kwai.com, kwai.com, kwai-video.com) - Extração direta dos CDNs
+    if any(k in url_limpa for k in ["kwai.com", "kwai-video.com", "k.kwai.com"]):
         try:
-            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
-            req = urllib.request.Request(
-                url_embed,
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                html_ig = resp.read().decode('utf-8', errors='ignore')
-                m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
-                if m_caption:
-                    texto_puro = re.sub(r'<[^>]+>', '', m_caption.group(1))
-                    titulo_detectado = limpar_texto_legenda(texto_puro)
+            req_k = urllib.request.Request(url_limpa, headers=headers_padrao)
+            with urllib.request.urlopen(req_k, timeout=10) as resp:
+                html_kwai = resp.read().decode('utf-8', errors='ignore')
                 
-                m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
-                        re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
-                if m_mp4:
-                    stream_url = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
-                    req_v = urllib.request.Request(stream_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req_v, timeout=20) as r, open(caminho_saida, 'wb') as f:
-                        while chunk := r.read(64 * 1024):
-                            f.write(chunk)
-                    if tem_imagem_de_video(caminho_saida):
-                        return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
+            m_tit = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:)?description["\'][^>]+content=["\']([^"\']+)["\']', html_kwai, re.IGNORECASE)
+            if m_tit:
+                titulo_detectado = limpar_texto_legenda(m_tit.group(1))
+
+            m_vid = re.search(r'<meta[^>]+property=["\']og:video(?::url)?["\']\s+content=["\']([^"\']+)["\']', html_kwai, re.IGNORECASE) or \
+                    re.search(r'"(?:photoUrl|videoUrl|playUrl)":\s*"([^"]+\.mp4[^"]*)"', html_kwai) or \
+                    re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_kwai)
+
+            stream_url = ""
+            if m_vid:
+                stream_url = m_vid.group(1).replace(r'\/', '/').replace('&amp;', '&')
+            else:
+                matches = re.findall(r'https:\/\/[^\s"\'<>]+\.mp4[^\s"\'<>]*', html_kwai.replace(r'\/', '/'))
+                for m in matches:
+                    if any(k in m for k in ["kwimgs", "kwai", "cdn"]):
+                        stream_url = m.replace('&amp;', '&')
+                        break
+
+            if stream_url:
+                req_v = urllib.request.Request(stream_url, headers=headers_padrao)
+                with urllib.request.urlopen(req_v, timeout=25) as r, open(caminho_saida, 'wb') as f:
+                    while chunk := r.read(64 * 1024):
+                        f.write(chunk)
+                if tem_imagem_de_video(caminho_saida):
+                    return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
         except:
             pass
 
-    # 2. TikTok: API direta sem restrição
+    # 2. TIKTOK (API direta rápida)
     if "tiktok.com" in url_limpa:
         try:
             api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url_limpa)}"
@@ -278,7 +291,32 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         except:
             pass
 
-    # 3. Fallback direto via yt-dlp sem flags que bloqueiam download
+    # 3. INSTAGRAM (Embed direto rápido)
+    if "instagram.com" in url_limpa:
+        try:
+            url_embed = re.sub(r'\?.*$', '', url_limpa).rstrip('/') + "/embed/captioned/"
+            req = urllib.request.Request(url_embed, headers=headers_padrao)
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                html_ig = resp.read().decode('utf-8', errors='ignore')
+                m_caption = re.search(r'class=["\']Caption["\'][^>]*>([\s\S]*?)<\/div>', html_ig)
+                if m_caption:
+                    texto_puro = re.sub(r'<[^>]+>', '', m_caption.group(1))
+                    titulo_detectado = limpar_texto_legenda(texto_puro)
+                
+                m_mp4 = re.search(r'video_url["\']\s*:\s*["\']([^"\']+\.mp4[^"\']*)["\']', html_ig) or \
+                        re.search(r'src=["\'](https:\/\/[^"\']+\.mp4[^"\']*)["\']', html_ig)
+                if m_mp4:
+                    stream_url = m_mp4.group(1).replace(r'\u0026', '&').replace(r'\/', '/')
+                    req_v = urllib.request.Request(stream_url, headers=headers_padrao)
+                    with urllib.request.urlopen(req_v, timeout=20) as r, open(caminho_saida, 'wb') as f:
+                        while chunk := r.read(64 * 1024):
+                            f.write(chunk)
+                    if tem_imagem_de_video(caminho_saida):
+                        return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
+        except:
+            pass
+
+    # 4. Fallback universal com yt-dlp (com User-Agent simulando Chrome para evitar 403)
     cmd = [
         "yt-dlp",
         "--no-playlist",
@@ -286,11 +324,12 @@ def baixar_video_com_extracao(url_alvo, pasta_destino):
         "-f", "best[ext=mp4]/best",
         "-o", caminho_saida,
         "--force-overwrites",
-        "--socket-timeout", "15",
+        "--socket-timeout", "20",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         url_limpa
     ]
     try:
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
         if tem_imagem_de_video(caminho_saida):
             return True, caminho_saida, (titulo_detectado or "ASSISTA ATÉ AO FIM")
     except:
@@ -305,7 +344,8 @@ def quebrar_duas_linhas(frase):
     melhor_corte = max(1, len(palavras) // 2)
     menor_dif = float('inf')
     for i in range(1, len(palavras)):
-        l1, l2 = " ".join(palavras[:i]), " ".join(palavras[i:])
+        l1 = " ".join(palavras[:i])
+        l2 = " ".join(palavras[i:])
         dif = abs(len(l1) - len(l2))
         if dif < menor_dif:
             menor_dif, melhor_corte = dif, i
