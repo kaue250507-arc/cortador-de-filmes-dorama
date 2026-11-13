@@ -117,7 +117,7 @@ st.markdown("""
 # ==============================================================================
 PASTA_STORAGE = os.path.abspath("storage_app")
 os.makedirs(PASTA_STORAGE, exist_ok=True)
-CACHE_EMOJIS = os.path.abspath("emojis_cache")
+CACHE_EMOJIS = os.path.abspath("emojis_apple_cache")
 os.makedirs(CACHE_EMOJIS, exist_ok=True)
 
 MOLDE_PERSISTENTE = os.path.join(PASTA_STORAGE, "molde_salvo.png")
@@ -352,50 +352,67 @@ def quebrar_duas_linhas(frase):
     return " ".join(palavras[:melhor_corte]), " ".join(palavras[melhor_corte:])
 
 # ==============================================================================
-# MOTOR DE EMOJIS EM ALTA QUALIDADE (TWEMOJI OFICIAL)
+# MOTOR DE EMOJIS DO IPHONE (APPLE iOS EMOJI EM ALTA DEFINIÇÃO)
 # ==============================================================================
-def is_emoji(char):
-    cp = ord(char)
+def is_emoji_base(cp):
     return (
         0x1F600 <= cp <= 0x1F64F or 0x1F300 <= cp <= 0x1F5FF or
         0x1F680 <= cp <= 0x1F6FF or 0x1F1E0 <= cp <= 0x1F1FF or
         0x2600 <= cp <= 0x26FF   or 0x2700 <= cp <= 0x27BF   or
-        0xFE00 <= cp <= 0xFE0F   or 0x1F900 <= cp <= 0x1F9FF or
-        0x1FA70 <= cp <= 0x1FAFF
+        0x1F900 <= cp <= 0x1F9FF or 0x1FA70 <= cp <= 0x1FAFF
     )
+
+def is_emoji_modifier(cp):
+    return (0xFE00 <= cp <= 0xFE0F) or (0x1F3FB <= cp <= 0x1F3FF) or (cp == 0x200D)
 
 def split_text_emojis(texto):
     chunks = []
     buf = ""
+    zwj_pending = False
     for c in texto:
-        if is_emoji(c):
+        cp = ord(c)
+        if is_emoji_modifier(cp):
+            if chunks and chunks[-1][0] == 'emoji':
+                chunks[-1] = ('emoji', chunks[-1][1] + c)
+                if cp == 0x200D:
+                    zwj_pending = True
+        elif is_emoji_base(cp):
             if buf:
                 chunks.append(('text', buf))
                 buf = ""
-            chunks.append(('emoji', c))
+            if zwj_pending and chunks and chunks[-1][0] == 'emoji':
+                chunks[-1] = ('emoji', chunks[-1][1] + c)
+                zwj_pending = False
+            else:
+                chunks.append(('emoji', c))
+                zwj_pending = False
         else:
+            zwj_pending = False
             buf += c
     if buf:
         chunks.append(('text', buf))
     return chunks
 
 def get_emoji_image(char_emoji, size_px):
-    hex_code = "-".join([f"{ord(c):x}" for c in char_emoji if ord(c) != 0xfe0f])
-    cache_path = os.path.join(CACHE_EMOJIS, f"{hex_code}.png")
+    hex_full = "-".join([f"{ord(c):x}" for c in char_emoji])
+    hex_clean = "-".join([f"{ord(c):x}" for c in char_emoji if ord(c) != 0xfe0f])
+    cache_path = os.path.join(CACHE_EMOJIS, f"{hex_clean}.png")
 
-    if not os.path.exists(cache_path):
-        urls = [
-            f"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{hex_code}.png",
-            f"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/{hex_code}.png"
-        ]
+    if not os.path.exists(cache_path) or os.path.getsize(cache_path) <= 100:
+        hex_candidates = list(dict.fromkeys([hex_full, hex_clean, f"{hex_clean}-fe0f"]))
+        urls = []
+        for h in hex_candidates:
+            urls.append(f"https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/{h}.png")
+            urls.append(f"https://unpkg.com/emoji-datasource-apple@15.1.2/img/apple/64/{h}.png")
         for u in urls:
             try:
                 req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    with open(cache_path, 'wb') as f:
-                        f.write(resp.read())
-                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 100:
-                    break
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    data = resp.read()
+                    if len(data) > 100:
+                        with open(cache_path, 'wb') as f:
+                            f.write(data)
+                        break
             except:
                 pass
 
